@@ -841,7 +841,7 @@ function rReport(rid){return rState.reports.find(r=>r.id===rid)}
 function rPatient(pid){return PATIENTS.find(p=>p.id===pid)}
 function rCanPatient(pid){return rState.patientAccess&&rPatient(pid)?.allowed===true}
 function rHasHidden(r){return r.form.patients.some(pid=>!rCanPatient(pid))}
-function rNames(form){const values=[...form.patients.map(pid=>rCanPatient(pid)?rPatient(pid)?.name:'Patient details restricted'),...form.employees.map(eid=>EMPLOYEES.find(e=>e.id===eid)?.name||'Employee'),...form.others];return values.length?values.join(', '):form.affected.includes('none')?'No person affected':form.affected.includes('unknown')?'Not known yet':form.affected.includes('patient')?'Patient not identified':form.affected.includes('employee')?'Employee not identified':'None named'}
+function rNames(form){const values=[...form.patients.map(pid=>rCanPatient(pid)?rPatient(pid)?.name:'Patient details restricted'),...form.employees.map(eid=>EMPLOYEES.find(e=>e.id===eid)?.name||'Employee'),...form.others];return values.length?values.join(', '):form.affected.includes('none')?'No person affected':form.affected.includes('unknown')?'Unknown person':form.affected.includes('patient')?'Patient not identified':form.affected.includes('employee')?'Employee not identified':'None named'}
 function rClass(form){const t=typeBy(form.type),s=t?.subs.find(s=>s.id===form.subtype);return s?`${t.name} → ${s.name}`:'Not assigned'}
 function rShortClass(form){return typeBy(form.type)?.subs.find(s=>s.id===form.subtype)?.name||'Not assigned'}
 function rStatus(r){return ({submitted:'Submitted',under_review:'Under review',closed:'Closed'})[r.status]||r.status}
@@ -3523,9 +3523,10 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  function openDecision(r,kind,target){
   const config=formRoute(r),first=(config.second&&r.mvpReview&&r.mvpReview.firstCompleted?config.second:config.first)||{response:'approval',signature:true};const verb=first.response==='acknowledgment'?'Acknowledge':'Approve';
   pendingDecision={id:r.id,kind,target};
-  const contents=kind==='approved'?`<div class="v32-decision-details"><span>Report</span><strong>${esc(r.id)}</strong><span>Decision</span><strong>${verb}</strong><span>Reviewer</span><strong>${actor}</strong></div><p class="v32-hint">${config.second&&!(r.mvpReview&&r.mvpReview.firstCompleted)?'Your review is recorded and the report stays In Review for the second reviewer.':'This completes the review and moves the report to '+(target||'Follow up pending')+'.'}</p>${first.signature?`<div class="v32-sign"><div class="v32-sign-head"><label class="v32-label" id="v32-sign-label">Sign below <span aria-hidden="true">*</span></label><button type="button" class="v32-link" data-sign-clear>Clear</button></div><div class="v32-pad"><canvas id="v32-pad" width="744" height="248" role="img" aria-labelledby="v32-sign-label"></canvas><span class="v32-pad-hint" id="v32-pad-hint">Sign here</span><span class="v32-pad-line" aria-hidden="true"></span></div><p class="v32-hint">By signing, you confirm you have reviewed this report. Use a mouse, finger or stylus.</p></div>`:`<p class="v32-hint">This workflow does not require a signature.</p><label class="v32-check"><input type="checkbox" id="v32-confirm"> I confirm that I have reviewed this report and want to ${verb.toLowerCase()} it.</label>`}`:
+  const contents=kind==='approved'?`${(()=>{const f=r.form,lv=levels().find(l=>l.id===f.severity),urg=({yes:'Urgent',no:'Not urgent',unknown:'Not sure'})[f.urgency]||'Not sure';return `<div class="v32-info"><strong>${esc(rShortClass(f))}</strong><span>${esc(String(r.id).replace(/^INC-?0*/,'IR'))} · ${esc(lv?lv.name:'Not sure')} · ${esc(urg)}</span></div>`})()}${first.signature?`<div class="v32-sign"><div class="v32-sign-head"><label class="v32-label" id="v32-sign-label">Sign below <span aria-hidden="true">*</span></label><button type="button" class="v32-link" data-sign-clear>Clear</button></div><div class="v32-pad"><canvas id="v32-pad" width="744" height="248" role="img" aria-labelledby="v32-sign-label"></canvas><span class="v32-pad-hint" id="v32-pad-hint">Sign here</span><span class="v32-pad-line" aria-hidden="true"></span></div></div>`:`<label class="v32-check"><input type="checkbox" id="v32-confirm"> I confirm that I have reviewed this report and want to ${verb.toLowerCase()} it.</label>`}`:
    `<div class="v32-decision-details"><span>Report</span><strong>${esc(r.id)}</strong><span>Reviewer</span><strong>${actor}</strong></div><label class="v32-label" for="v32-reason">Reason for rejection <span aria-hidden="true">*</span></label><select id="v32-reason" class="v32-input" required><option value="">Select a reason</option><option>Duplicate incident report</option><option>Incorrect incident classification</option><option>Incomplete or inaccurate report</option><option>Not an incident</option><option>Other</option></select><label class="v32-label" for="v32-note">Additional notes (optional)</label><textarea id="v32-note" class="v32-input" rows="3" placeholder="Add details for the audit history"></textarea>`;
-  showModal('v32-review-decision',kind==='approved'?`${verb} incident report`:'Reject incident report','',`<div class="v32-modal-content">${contents}<p class="v32-error" id="v32-error" role="alert" hidden></p></div>`,`<button type="button" class="btn" data-v32="cancel">Cancel</button><span class="push"></span><button type="button" class="btn ${kind==='approved'?'primary':'danger'}" data-v32="confirm">${kind==='approved'?verb:'Reject report'}</button>`,{center:true,eyebrow:'Incident review'});
+  showModal('v32-review-decision',kind==='approved'?`${verb} report`:'Reject incident report','',`<div class="v32-modal-content">${contents}<p class="v32-error" id="v32-error" role="alert" hidden></p></div>`,kind==='approved'?`<span class="push"></span><button type="button" class="btn" data-v32="cancel">Cancel</button><button type="button" class="btn primary" data-v32="confirm">${verb}</button>`:`<button type="button" class="btn" data-v32="cancel">Cancel</button><span class="push"></span><button type="button" class="btn danger" data-v32="confirm">Reject report</button>`,{center:true,eyebrow:'Incident review'});
+  if(kind==='approved'&&window.rvCompact)window.rvCompact();
  }
  function confirmDecision(){const info=pendingDecision;if(!info)return;const r=rState.reports.find(x=>x.id===info.id);if(!r)return;
   const v=r.mvpReview||(r.mvpReview={}),config=formRoute(r),first=(config.second&&v.firstCompleted?config.second:config.first)||{response:'approval',signature:true},error=document.getElementById('v32-error');
@@ -3913,7 +3914,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  }
 
  /* ---------- incident rows (My Reports and My Reviews use the same columns) ---------- */
- const incidentCols=kind=>[
+ const incidentColsBase=kind=>[
   {k:'id',label:'Incident ID',w:98,sort:true,first:'asc'},
   {k:'names',label:'Affected people',w:150},
   {k:'type',label:'Incident type',w:200,sort:true,first:'asc'},
@@ -3927,38 +3928,191 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   {k:'fac',label:'Facility',w:124,sort:kind==='reviews',first:'asc'},
   {k:'actions',label:'Actions',w:158,align:'right'}
  ];
+ const REVIEW_COLS=[
+  {k:'id',label:'ID',w:76,sort:true,first:'asc'},
+  {k:'type',label:'Incident type',w:190,sort:true,first:'asc'},
+  {k:'names',label:'Affected people',w:160},
+  {k:'severity',label:'Severity',w:132,sort:true,first:'desc'},
+  {k:'urgency',label:'Urgency',w:78,sort:true,first:'desc'},
+  {k:'by',label:'Submitted by',w:120,sort:true,first:'asc'},
+  {k:'status',label:'Status',w:190,sort:true,first:'asc'},
+  {k:'next',label:'Next requirement',w:220,sort:true,first:'asc'},
+  {k:'loc',label:'Location',w:190,sort:true,first:'asc'},
+  {k:'submitted',label:'Reported on',w:132,sort:true,first:'desc'},
+  {k:'actions',label:'Actions',w:158,align:'right'}
+ ];
+ const REPORT_COLS=[
+  {k:'id',label:'ID',w:76,sort:true,first:'asc'},
+  {k:'type',label:'Incident type',w:190,sort:true,first:'asc'},
+  {k:'names',label:'Affected people',w:160},
+  {k:'severity',label:'Severity',w:132,sort:true,first:'desc'},
+  {k:'urgency',label:'Urgency',w:78,sort:true,first:'desc'},
+  {k:'status',label:'Status',w:180,sort:true,first:'asc'},
+  {k:'next',label:'Next requirement',w:220,sort:true,first:'asc'},
+  {k:'loc',label:'Location',w:190,sort:true,first:'asc'},
+  {k:'submitted',label:'Reported on',w:132,sort:true,first:'desc'},
+  {k:'actions',label:'Actions',w:158,align:'right'}
+ ];
+ const incidentCols=kind=>kind==='reviews'?REVIEW_COLS:kind==='reports'?REPORT_COLS:incidentColsBase(kind);
  function normReport(x){
   if(x.kind==='draft'){const d=x.d,f=d.form;return {kind:'draft',id:d.id,f,names:rNames(f),type:f.type?rShortClass(f):'Not assigned',typeId:f.type||'',sev:f.severity||'',urg:f.urgency||'no',at:null,sortAt:new Date(d.savedAt).getTime(),by:'—',status:'Draft',svc:svcName(d.location||REPORTER.location),fac:facOf(d.location||REPORTER.location)}}
   const r=x.r,f=r.form;return {kind:'report',id:r.id,f,r,names:rNames(f),type:rHasHidden(r)?'Incident details restricted':rShortClass(f),typeId:f.type||'',sev:f.severity||'',urg:f.urgency||'no',at:r.submittedAt,sortAt:new Date(r.submittedAt).getTime(),by:r.reporterName||'—',status:rStatus(r),svc:svcName(r.location),fac:facOf(r.location)};
  }
  function normReview(r){const f=r.form;return {kind:'review',id:r.id,f,r,names:rNames(f),type:rShortClass(f),typeId:f.type||'',sev:f.severity||'',urg:f.urgency||'no',at:r.submittedAt,sortAt:new Date(r.submittedAt).getTime(),by:r.reporterName||'—',status:rStatus(r),svc:svcName(r.location),fac:facOf(r.location)}}
- const sortVal={id:o=>o.id,names:o=>o.names,type:o=>o.type,severity:o=>sevRank(o.sev),urgency:o=>urgRank[o.urg]??0,submitted:o=>o.sortAt,by:o=>o.by,status:o=>STATUS_ORDER.indexOf(o.status),svc:o=>o.svc,fac:o=>o.fac,sla:o=>o.r?incSla(o.r).sort:9e15};
+ const sortVal={id:o=>o.id,names:o=>o.names,type:o=>o.type,severity:o=>sevRank(o.sev),urgency:o=>urgRank[o.urg]??0,submitted:o=>o.sortAt,by:o=>o.by,status:o=>STATUS_ORDER.indexOf(o.status),svc:o=>o.svc,fac:o=>o.fac,sla:o=>o.r?incSla(o.r).sort:9e15,loc:o=>o.svc+' '+o.fac,next:o=>{const n=nextOf(o);return n&&n.key!=='none'?STATUS_ORDER.indexOf(n.key):99}};
+ /* The default tab is Open: every report that is not Closed or Rejected (drafts included on My Reports). Its internal key is still 'all'. */
+ const isOpenItem=o=>o.status!=='Closed'&&o.status!=='Rejected';
  function applyIncident(list,st){
   const q=st.q.trim().toLowerCase();
-  let out=list.filter(o=>!q||[o.id,o.names,o.type,rClass(o.f),o.by,o.svc,o.fac,o.status].join(' ').toLowerCase().includes(q));
+  let out=list.filter(o=>!q||[o.id,shortId(o.id),o.names,o.type,rClass(o.f),o.by,o.svc,o.fac,o.status].join(' ').toLowerCase().includes(q));
   const f=st.f;
   if(f.type!=='all')out=out.filter(o=>o.typeId===f.type);
   if(f.severity!=='all')out=out.filter(o=>f.severity==='none'?!o.sev:o.sev===f.severity);
   if(f.urgency!=='all')out=out.filter(o=>o.urg===f.urgency);
+  /* Set from the summary cards, which count submitted reports (My Reports) or open reports (My Reviews): drafts, or closed and rejected, stay out. */
+  if(st.wf&&(f.severity!=='all'||f.urgency!=='all'))out=out.filter(o=>o.kind==='draft'?false:o.kind==='review'?!['Closed','Rejected'].includes(o.status):true);
+  if(st.quick&&window.incPreds&&window.incPreds[st.quick])out=out.filter(o=>o.r&&window.incPreds[st.quick](o.r));
+  if(advCount(st))out=out.filter(o=>advMatch(o,st.adv));
   const get=sortVal[st.sort.key]||sortVal.submitted,sign=st.sort.dir==='asc'?1:-1;
   return out.sort((a,b)=>sign*cmp(get(a),get(b))||cmp(b.sortAt,a.sortAt));
  }
  const badge=s=>`<span class="mvp-status mvp-${s.toLowerCase().replace(/ /g,'-')}">${esc(s)}</span>`;
  const slaCell=o=>{if(!o.r)return '—';const x=incSla(o.r);return x.tone?`<span class="inc-sla ${x.tone}">${esc(x.text)}</span>`:'—'};
- const incidentToolbar=(kind,st,placeholder)=>searchBox(kind,st.q,placeholder)+selectBox(kind,'type','Incident types','Filter by incident type',typeOptions(),st.f.type)+selectBox(kind,'severity','Severity','Filter by severity',severityOptions(),st.f.severity)+selectBox(kind,'urgency','Urgency','Filter by urgency',urgencyOptions(),st.f.urgency);
+ /* ===== My Reviews table helpers ===== */
+ paths.filterlines='M4 6h16 M7 12h10 M10 18h4';
+ const shortId=id=>String(id).replace(/^INC-?/,'IR');
+ const peopleList=f=>[...f.patients.map(pid=>rCanPatient(pid)?rPatient(pid)?.name:'Patient details restricted'),...f.employees.map(eid=>EMPLOYEES.find(e=>e.id===eid)?.name||'Employee'),...f.others];
+ const fmtDT=t=>t?new Date(t).toLocaleString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+ /* Who last changed the status and when. The history stores free text, so the person is read from it. */
+ function statusInfo(r){
+  const rules=[[/^Status changed to .+? by (.+?)\.?$/i,m=>m[1]],[/^Review (?:claimed|accepted) by (.+?)\.?$/i,m=>m[1]],[/^Report (?:approved|acknowledged|rejected) by (.+?)(?: with signature confirmation)?(?:\.\s.*|\.)?$/i,m=>m[1]],[/^Report (?:moved back to In Review|returned to Reported) by (.+?)\.?$/i,m=>m[1]],[/^(?:Approved|Rejected) by (.+?)\.?$/i,m=>m[1]],[/^Returned to Reported:/i,()=>'System'],[/^Report submitted by/i,()=>r.reporterName||null]];
+  const log=(r.timeline||[]).slice().reverse();
+  for(const e of log){for(const [re,who] of rules){const m=String(e.text||'').match(re);if(m)return {at:e.at,by:who(m)}}}
+  const v=r.mvpReview||{},s=incStatus(r);
+  if(s==='Reported')return {at:r.submittedAt,by:r.reporterName||null};
+  if(s==='In Review'&&r.acceptedAt)return {at:r.acceptedAt,by:v.owner||null};
+  return {at:null,by:null};
+ }
+ /* Next requirement = the next status in the flow: Reported, In Review, Follow up pending, Follow up completed, Closed.
+    Follow-up is optional, so a report with no follow-up actions goes from In Review straight to Closed.
+    The date and the person or group describe the work that moves it there. */
+ function nextInfo(r){
+  const s=incStatus(r),v=r.mvpReview||{},step=vr12Step(r),two=Boolean(step.second);
+  if(s==='Closed'||s==='Rejected')return {key:'none',label:'—',due:null,who:null,group:null};
+  const mk=(key,due,who,group)=>({key,label:key,due:due||null,who:who||null,group:group||null});
+  if(s==='Reported')return mk('In Review',r.acceptanceDue,groupName(step.first&&step.first.group||r.flow&&r.flow.group));
+  if(s==='In Review'){
+   const hasFollow=((r.mvpActions||[]).length||(step.actions||[]).length)>0;
+   const first=v.reviews&&v.reviews[0]&&v.reviews[0].at,secondRound=two&&Boolean(v.firstCompleted);
+   const due=secondRound?(first?rDue(first,rSla(store.published,step.second.sla)):null):(r.reviewDue||null);
+   const grp=groupName(secondRound?step.second.group:step.first&&step.first.group||r.flow&&r.flow.group);
+   return mk(hasFollow?'Follow up pending':'Closed',due,v.owner||grp,v.owner?grp:null);
+  }
+  if(s==='Follow up pending'){
+   const open=(r.mvpActions||[]).filter(a=>!a.completedAt);
+   const dues=open.filter(a=>a.startAt&&a.sla).map(a=>rDue(a.startAt,a.sla)).sort((a,b)=>new Date(b)-new Date(a));
+   const groups=[...new Set(open.map(a=>groupName(a.group)))];
+   return mk('Follow up completed',dues[0],groups.length?groups.join(', '):(v.owner||'Reviewer'));
+  }
+  return mk('Closed',null,v.owner||'Reviewer');
+ }
+ const NEXT_OPTIONS=[['In Review','In Review'],['Follow up pending','Follow up pending'],['Follow up completed','Follow up completed'],['Closed','Closed']];
+ const NEXT_OPTIONS_REPORTS=[['Reported','Reported'],...NEXT_OPTIONS];
+ /* A draft has not been submitted yet, so the reporter owns the next step. */
+ const nextOf=o=>o.r?nextInfo(o.r):o.kind==='draft'?{key:'Reported',label:'Reported',due:null,who:REPORTER.name,group:null}:null;
+ const infoBtn=(kind,id,label)=>`<button type="button" class="tbl-i" data-pop="${kind}" data-id="${esc(id)}" aria-expanded="false" aria-haspopup="dialog" aria-label="${esc(label)} for ${esc(shortId(id))}">${icon('info',14)}</button>`;
+ const peopleCell=o=>{
+  const list=peopleList(o.f);
+  if(list.length<2)return `<span class="tbl-trunc" title="${esc(o.names)}">${esc(o.names)}</span>`;
+  const n=list.length-1;
+  return `<span class="tbl-people"><span class="tbl-trunc" title="${esc(list[0])}">${esc(list[0])}</span><button type="button" class="tbl-more" data-pop="people" data-id="${esc(o.id)}" aria-expanded="false" aria-haspopup="dialog" aria-label="Show ${n} more affected ${n===1?'person':'people'}">+ ${n}</button></span>`;
+ };
+ /* ----- advanced filters (My Reviews) ----- */
+ const advDefault=()=>({from:'',to:'',svc:'all',fac:'all',by:'all',next:'all',who:'all',overdue:false});
+ const advCount=st=>{const a=st.adv;if(!a)return 0;return (a.from||a.to?1:0)+['svc','fac','by','next','who'].filter(k=>a[k]!=='all').length+(a.overdue?1:0)};
+ const ymd=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+ function advMatch(o,a){
+  if(a.from&&(!o.at||ymd(o.at)<a.from))return false;
+  if(a.to&&(!o.at||ymd(o.at)>a.to))return false;
+  if(a.svc!=='all'&&o.svc!==a.svc)return false;
+  if(a.fac!=='all'&&o.fac!==a.fac)return false;
+  if(a.by!=='all'&&o.by!==a.by)return false;
+  const n=nextOf(o);
+  if(a.next!=='all'&&(!n||n.key!==a.next))return false;
+  if(a.who!=='all'&&(!n||n.who!==a.who))return false;
+  if(a.overdue&&!(n&&n.due&&new Date(n.due)<rNow()))return false;
+  return true;
+ }
+ function advHtml(st,kind){
+  const a=Object.assign(advDefault(),st.adv),mine=kind==='reports',
+   all=mine?[...rOwn().map(r=>normReport({kind:'report',r})),...rState.drafts.map(d=>normReport({kind:'draft',d}))]:vrList().map(normReview);
+  const uniq=arr=>[...new Set(arr.filter(Boolean))].sort((x,y)=>x.localeCompare(y)).map(v=>[v,v]);
+  const sel=(key,label,opts)=>`<label class="tbl-adv-f"><span>${label}</span><select data-adv="${key}"><option value="all">All</option>${opts.map(([v,l])=>`<option value="${esc(v)}"${String(a[key])===String(v)?' selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+  return `<div class="tbl-adv-head"><strong>Advanced filters</strong><button type="button" class="tbl-textlink" data-adv-reset>Reset</button></div><div class="tbl-adv-grid"><label class="tbl-adv-f"><span>Reported from</span><input type="date" data-adv="from" value="${esc(a.from)}"></label><label class="tbl-adv-f"><span>Reported to</span><input type="date" data-adv="to" value="${esc(a.to)}"></label>${sel('svc','Service location',uniq(all.map(o=>o.svc)))}${sel('fac','Facility',uniq(all.map(o=>o.fac)))}${mine?'':sel('by','Submitted by',uniq(all.map(o=>o.by)))}${sel('next','Next requirement',mine?NEXT_OPTIONS_REPORTS:NEXT_OPTIONS)}${mine?'':sel('who','Responsible',uniq(all.map(o=>o.r&&nextInfo(o.r).who)))}<label class="tbl-adv-check"><input type="checkbox" data-adv="overdue"${a.overdue?' checked':''}> Overdue only</label></div>`;
+ }
+ const advBtn=(kind,st)=>{if(kind==='patients')return '';const n=advCount(st);return `<button type="button" class="tbl-adv" data-pop="advanced" data-kind="${kind}" aria-expanded="false" aria-haspopup="dialog">${icon('filterlines',15)}<span>Advanced filters</span>${n?`<b aria-label="${n} applied">${n}</b>`:''}</button>`};
+ /* ----- one small floating popover for table cells ----- */
+ let pop=null,popBtn=null,popKind='',popTbl='';
+ function popClose(restore){if(pop){pop.remove();pop=null}if(popBtn){popBtn.setAttribute('aria-expanded','false');if(restore&&popBtn.isConnected)popBtn.focus({preventScroll:true})}popBtn=null;popKind='';popTbl=''}
+ function popOpen(btn,html,kind,tbl){
+  popClose();popBtn=btn;popKind=kind;popTbl=tbl||'';btn.setAttribute('aria-expanded','true');
+  pop=document.createElement('div');pop.className='tbl-pop'+(kind==='advanced'?' tbl-pop-adv':'');pop.setAttribute('role','dialog');pop.setAttribute('aria-label',kind==='advanced'?'Advanced filters':kind==='status'?'Status details':kind==='next'?'Next requirement details':'Also affected');pop.tabIndex=-1;pop.dataset.tbl=popTbl;pop.innerHTML=html;
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect(),w=pop.offsetWidth,h=pop.offsetHeight,vw=document.documentElement.clientWidth,vh=document.documentElement.clientHeight;
+  let left=kind==='advanced'?r.right-w:r.left;left=Math.max(8,Math.min(left,vw-w-8));
+  let top=r.bottom+6;if(top+h>vh-8)top=Math.max(8,r.top-h-6);
+  pop.style.left=left+'px';pop.style.top=top+'px';pop.focus({preventScroll:true});
+ }
+ function popHtml(kind,id){
+  const r=rState.reports.find(x=>x.id===id),d=r?null:rState.drafts.find(x=>x.id===id);
+  if(!r&&!d)return '';
+  if(kind==='status'){const i=r?statusInfo(r):{at:d.savedAt,by:REPORTER.name};return `<h4>Status</h4><dl><dt>Updated</dt><dd>${i.at?esc(fmtDT(i.at)):'Not recorded'}</dd><dt>Updated by</dt><dd>${esc(i.by||'Not recorded')}</dd></dl>`}
+  if(kind==='next'){const n=nextOf(r?{r}:{kind:'draft'}),late=Boolean(n.due&&new Date(n.due)<rNow());return `<h4>To be completed before</h4>${n.due?`<p class="tbl-pop-date${late?' late':''}">${esc(fmtDT(n.due))}${late?'<span class="sr-only"> (overdue)</span>':''}</p>`:'<p class="tbl-pop-none">No target date set</p>'}<dl><dt>Responsible</dt><dd>${esc(n.who||'Not assigned')}</dd></dl>`}
+  if(kind==='people'){const list=peopleList((r||d).form).slice(1);return `<h4>Also affected</h4><ul>${list.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`}
+  return '';
+ }
+ function popRefresh(){
+  if(popKind==='advanced'){const b=document.querySelector('[data-pop="advanced"][data-kind="'+popTbl+'"]');if(b){popBtn=b;b.setAttribute('aria-expanded','true')}else popClose()}
+  else popClose();
+ }
+ window.incPopClose=popClose;
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-pop]');
+  if(b){
+   e.preventDefault();
+   if(popBtn===b){popClose(true);return}
+   const kind=b.dataset.pop;
+   popOpen(b,kind==='advanced'?advHtml(T[b.dataset.kind],b.dataset.kind):popHtml(kind,b.dataset.id),kind,b.dataset.kind);
+   return;
+  }
+  const reset=e.target.closest('[data-adv-reset]');
+  if(reset){const tbl=popTbl||'reviews';T[tbl].adv=advDefault();T[tbl].page=1;refresh(tbl);if(pop)pop.innerHTML=advHtml(T[tbl],tbl);return}
+  if(pop&&!e.target.closest('.tbl-pop'))popClose();
+ });
+ document.addEventListener('change',e=>{
+  const el=e.target.closest('[data-adv]');if(!el)return;
+  const tbl=el.closest('.tbl-pop')?.dataset.tbl||'reviews',st=T[tbl];st.adv=Object.assign(advDefault(),st.adv);st.adv[el.dataset.adv]=el.type==='checkbox'?el.checked:el.value;st.page=1;refresh(tbl);
+ });
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&pop){e.preventDefault();e.stopImmediatePropagation();popClose(true)}},true);
+ window.addEventListener('resize',()=>popClose());
+ document.addEventListener('scroll',e=>{if(pop&&!e.target.closest?.('.tbl-pop'))popClose()},true);
+ const filtersActive=st=>Boolean(st.q.trim()||st.f.type!=='all'||st.f.severity!=='all'||st.f.urgency!=='all'||(st.tab&&st.tab!=='all')||st.quick||advCount(st)>0);
+ const clearBtn=(kind,st)=>filtersActive(st)?`<button type="button" class="tbl-clear" data-tbl="clear" data-kind="${kind}">Clear filters</button>`:'';
+ const incidentToolbar=(kind,st,placeholder)=>searchBox(kind,st.q,placeholder)+selectBox(kind,'type','Incident types','Filter by incident type',typeOptions(),st.f.type)+selectBox(kind,'severity','Severity','Filter by severity',severityOptions(),st.f.severity)+selectBox(kind,'urgency','Urgency','Filter by urgency',urgencyOptions(),st.f.urgency)+clearBtn(kind,st)+advBtn(kind,st);
  const commonCells=(o,kind)=>`<td class="tbl-nw">${esc(o.id)}</td><td>${esc(o.names)}</td><td>${esc(o.type)}</td><td class="tbl-nw">${sevCell(o.sev)}</td><td class="tbl-nw">${URG[o.urg]||'No'}</td><td class="tbl-nw">${o.at?esc(rFmt(o.at)):'—'}</td>${kind==='reviews'?`<td>${esc(o.by)}</td>`:''}`;
 
  function buildReports(){
   const st=T.reports,drafts=rState.drafts.map(d=>normReport({kind:'draft',d})),subs=rOwn().map(r=>normReport({kind:'report',r}));
   const every=[...subs,...drafts];
   if(st.tab!=='all'&&!STATUS_ORDER.includes(st.tab))st.tab='all';
-  const base=st.tab==='all'?every:every.filter(o=>o.status===st.tab);
+  const base=st.tab==='all'?every.filter(isOpenItem):every.filter(o=>o.status===st.tab);
   const list=applyIncident(base,st),size=st.size;st.page=clamp(st.page,1,Math.max(1,Math.ceil(list.length/size)));
   const rows=list.slice((st.page-1)*size,st.page*size).map(o=>{
    const act=o.kind==='draft'?`<button type="button" class="tbl-btn" data-open data-r="continue-draft" data-id="${esc(o.id)}" aria-label="Edit draft ${esc(o.id)}">Edit</button>`:`<button type="button" class="tbl-btn" data-open data-r="view-report" data-id="${esc(o.id)}" aria-label="View report ${esc(o.id)}">View</button>`;
-   return `<tr tabindex="0" data-tbl-row="reports" data-id="${esc(o.id)}">${commonCells(o,'reports')}<td class="tbl-nw">${badge(o.status)}</td><td class="tbl-nw">${slaCell(o)}</td><td>${esc(o.svc)}</td><td>${esc(o.fac)}</td><td class="tbl-r"><span class="tbl-actions">${act}</span></td></tr>`;
+   const loc=`${o.svc}, ${o.fac}`,nx=nextOf(o),late=Boolean(nx&&nx.due&&new Date(nx.due)<rNow());
+   return `<tr tabindex="0" data-tbl-row="reports" data-id="${esc(o.id)}"><td class="tbl-nw tbl-id">${esc(shortId(o.id))}</td><td><strong class="tbl-type" title="${esc(o.type)}">${esc(o.type)}</strong></td><td>${peopleCell(o)}</td><td class="tbl-nw">${sevCell(o.sev)}</td><td class="tbl-nw">${URG[o.urg]||'No'}</td><td><span class="tbl-cellrow">${badge(o.status)}${infoBtn('status',o.id,'Status details')}</span></td><td>${!nx||nx.key==='none'?'<span class="tbl-dash" aria-label="None">—</span>':`<span class="tbl-cellrow"><span class="tbl-next${late?' late':''}" title="${esc(nx.label)}">${esc(nx.label)}</span>${infoBtn('next',o.id,'Next requirement details')}</span>`}</td><td title="${esc(loc)}">${esc(loc)}</td><td class="tbl-nw">${o.at?esc(rFmt(o.at)):'—'}</td><td class="tbl-r"><span class="tbl-actions">${act}</span></td></tr>`;
   });
-  const tabList=[['all','All',every.length],...STATUS_ORDER.map(k=>[k,k==='Draft'?'Drafts':k,every.filter(o=>o.status===k).length])];
+  const tabList=[['all','Open',every.filter(isOpenItem).length],...STATUS_ORDER.map(k=>[k,k==='Draft'?'Drafts':k,every.filter(o=>o.status===k).length])];
   return shell('reports',{tabsHtml:tabs('reports',tabList,st.tab,'Report status'),toolbar:incidentToolbar('reports',st,'Search incidents'),cols:incidentCols('reports'),rows,total:list.length,st});
  }
 
@@ -3967,19 +4121,30 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  const dotClass=s=>'tbl-dot d-'+s.toLowerCase().replace(/ /g,'-');
  /* Valid next statuses for the one status dropdown. Rejection is only possible before a report is accepted. */
  function choicesFor(r){return rStatus(r)==='Rejected'?['Rejected']:REVIEW_STATUSES.filter(x=>x!=='Rejected')}
+ /* Header controls of the review panel. The status dropdown is the same one the table uses, with the same rules. */
+ window.incStatusField=function(r){
+  const s=rStatus(r),choices=choicesFor(r),editable=Boolean(r.mvpReview&&r.mvpReview.owner)&&s!=='Rejected';
+  const tip=s==='Rejected'?'A rejected report cannot be changed.':r.mvpReview&&r.mvpReview.firstCompleted?'First review is complete. A second reviewer must accept this report before its status can change.':'Accept the report to change its status.';
+  return `<label class="tbl-select tbl-field"><span class="tbl-flabel">Status</span><select data-v30-status="${esc(r.id)}" aria-label="Change status" ${editable?'':`disabled title="${esc(tip)}"`}>${choices.map(c=>`<option value="${c}"${c===s?' selected':''}>${c}</option>`).join('')}</select><span class="tbl-chv">${icon('down',14)}</span></label>`;
+ };
+ window.incReviewerBar=function(r){
+  const s=rStatus(r),owner=Boolean(r.mvpReview&&r.mvpReview.owner),open=!['Closed','Rejected'].includes(s),id=esc(r.id);
+  return `<div class="rp-barctl">${window.incStatusField(r)}<button type="button" class="inc-textbtn" data-rv-edit="${id}" ${open?'':'disabled title="This report is closed."'}>Edit report</button><button type="button" class="inc-textbtn" data-rv-reassign="${id}" ${owner&&open?'':`disabled title="${owner?'This report is closed.':'Accept the report to reassign its owner.'}"`}>Reassign owner</button></div>`;
+ };
  function buildReviews(){
   const st=T.reviews,all=vrList().map(normReview);
   if(st.tab!=='all'&&!REVIEW_STATUSES.includes(st.tab))st.tab='all';
-  const count=k=>k==='all'?all.length:all.filter(o=>o.status===k).length;
-  const base=st.tab==='all'?all:all.filter(o=>o.status===st.tab);
+  const count=k=>k==='all'?all.filter(isOpenItem).length:all.filter(o=>o.status===k).length;
+  const base=st.tab==='all'?all.filter(isOpenItem):all.filter(o=>o.status===st.tab);
   const list=applyIncident(base,st),size=st.size;st.page=clamp(st.page,1,Math.max(1,Math.ceil(list.length/size)));
   const rows=list.slice((st.page-1)*size,st.page*size).map(o=>{
    const r=o.r,s=o.status,choices=choicesFor(r),editable=Boolean(r.mvpReview&&r.mvpReview.owner)&&s!=='Rejected';
    const statusCell=`<label class="tbl-select sm"><select data-v30-status="${esc(o.id)}" aria-label="Change status of ${esc(o.id)}" ${editable?'':'disabled title="'+(s==='Rejected'?'A rejected report cannot be changed.':r.mvpReview&&r.mvpReview.firstCompleted?'First review is complete. A second reviewer must accept this report before its status can change.':'Open the report and accept it to change its status.')+'"'}>${choices.map(c=>`<option value="${c}"${c===s?' selected':''}>${c}</option>`).join('')}</select><span class="tbl-chv">${icon('down',13)}</span></label>`;
    const accept='';
-   return `<tr tabindex="0" data-tbl-row="reviews" data-id="${esc(o.id)}">${commonCells(o,'reviews')}<td>${statusCell}</td><td class="tbl-nw">${slaCell(o)}</td><td>${esc(o.svc)}</td><td>${esc(o.fac)}</td><td class="tbl-r"><span class="tbl-actions">${accept}<button type="button" class="tbl-btn" data-open data-v30-view="${esc(o.id)}" aria-label="Review incident ${esc(o.id)}">Review</button></span></td></tr>`;
+   const loc=`${o.svc}, ${o.fac}`,nx=nextInfo(r),late=Boolean(nx.due&&new Date(nx.due)<rNow());
+   return `<tr tabindex="0" data-tbl-row="reviews" data-id="${esc(o.id)}"><td class="tbl-nw tbl-id">${esc(shortId(o.id))}</td><td><strong class="tbl-type" title="${esc(o.type)}">${esc(o.type)}</strong></td><td>${peopleCell(o)}</td><td class="tbl-nw">${sevCell(o.sev)}</td><td class="tbl-nw">${URG[o.urg]||'No'}</td><td>${esc(o.by)}</td><td><span class="tbl-cellrow">${statusCell}</span></td><td>${nx.key==='none'?'<span class="tbl-dash" aria-label="None">—</span>':`<span class="tbl-cellrow"><span class="tbl-next${late?' late':''}" title="${esc(nx.label)}">${esc(nx.label)}</span>${infoBtn('next',o.id,'Next requirement details')}</span>`}</td><td title="${esc(loc)}">${esc(loc)}</td><td class="tbl-nw">${o.at?esc(rFmt(o.at)):'—'}</td><td class="tbl-r"><span class="tbl-actions">${accept}<button type="button" class="tbl-btn" data-open data-v30-view="${esc(o.id)}" aria-label="Review incident ${esc(o.id)}">Review</button></span></td></tr>`;
   });
-  return shell('reviews',{tabsHtml:tabs('reviews',[['all','All',count('all')],...REVIEW_STATUSES.map(k=>[k,k,count(k)])],st.tab,'Review status'),toolbar:incidentToolbar('reviews',st,'Search reviews'),cols:incidentCols('reviews'),rows,total:list.length,st});
+  return shell('reviews',{tabsHtml:tabs('reviews',[['all','Open',count('all')],...REVIEW_STATUSES.map(k=>[k,k,count(k)])],st.tab,'Review status'),toolbar:incidentToolbar('reviews',st,'Search reviews'),cols:incidentCols('reviews'),rows,total:list.length,st});
  }
 
  /* ---------- patients ---------- */
@@ -4031,8 +4196,27 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const keepTop=node.querySelector('.tbl-scroll')?.scrollTop||0,keepLeft=node.querySelector('.tbl-scroll')?.scrollLeft||0;
   const tpl=document.createElement('template');tpl.innerHTML=BUILD[kind]().trim();node.replaceWith(tpl.content.firstElementChild);
   const fresh=document.querySelector(`[data-tbl-shell="${kind}"] .tbl-scroll`);if(fresh){fresh.scrollTop=keepTop;fresh.scrollLeft=keepLeft}
+  popRefresh();
+  if((kind==='reports'||kind==='reviews')&&window.incSync)window.incSync(kind);
   if(focusId){const el=document.getElementById(focusId);if(el){el.focus({preventScroll:true});if(caret!=null&&el.setSelectionRange)try{el.setSelectionRange(caret,caret)}catch(e){}}}
  }
+ /* Summary cards read and set the same filters as the toolbar and tabs. Clear filters resets all of them; sort and page size are left alone. */
+ window.incFilters={
+  get:kind=>{const st=T[kind];return {severity:st.f.severity,urgency:st.f.urgency,tab:st.tab||'all',quick:st.quick||''}},
+  toggle:(kind,field,val)=>{
+   const st=T[kind];
+   if(field==='status'){st.tab=st.tab===val?'all':val}
+   else if(field==='quick'){st.quick=st.quick===val?'':val;if(st.quick)st.tab='all'}
+   else{st.f[field]=st.f[field]===val?'all':val;st.wf=true;if(st.tab==='Draft')st.tab='all'}
+   st.page=1;refresh(kind);
+  }
+ };
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-tbl="clear"]');if(!b)return;
+  const kind=b.dataset.kind,st=T[kind];
+  st.q='';st.f.type='all';st.f.severity='all';st.f.urgency='all';st.tab='all';st.quick='';st.wf=false;st.page=1;if(kind!=='patients')st.adv=advDefault();popClose();
+  refresh(kind,'tbl-search-'+kind);
+ });
  document.addEventListener('click',e=>{
   const b=e.target.closest('[data-tbl]');
   if(b){
@@ -4046,7 +4230,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  });
  document.addEventListener('change',e=>{
   const el=e.target.closest('[data-tbl]');if(!el)return;const a=el.dataset.tbl,kind=el.dataset.kind,st=T[kind];
-  if(a==='filter'){st.f[el.dataset.key]=el.value;st.page=1;refresh(kind)}
+  if(a==='filter'){st.f[el.dataset.key]=el.value;st.wf=false;st.page=1;refresh(kind)}
   if(a==='size'){st.size=Number(el.value);st.page=1;refresh(kind)}
  });
  document.addEventListener('input',e=>{
@@ -4066,7 +4250,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const injured=f.injured.length?rParticipantOptions(f).filter(x=>f.injured.includes(x.id)).map(x=>esc(x.name)).join(', '):'';
   const response=({yes:'Help given right away',no:'No help given right away',unknown:'Not sure'})[f.response]||'Not provided';
   const inv=[...(f.involvedPatients||[]).map(v=>rCanPatient(v)?(rPatient(v)||{}).name:'Patient details restricted'),...(f.involvedEmployees||[]).map(v=>(EMPLOYEES.find(e=>e.id===v)||{}).name||'Employee'),...(f.involvedOthers||[])];
-  if(f.involvedNone)inv.push('No person involved');
+  if(f.involvedNone)inv.push('No person involved');if(f.involvedUnknown)inv.push('Unknown person');
   const src=f.sources.length?f.sources.map(s=>SOURCE[s]).join('; ')+(f.sources.includes('told')?` · Original source: ${esc(f.sourceRole||'role not known')}${f.sourceName?', '+esc(f.sourceName):''}`:''):'Not provided';
   const att=(f.attachments||[]).map(a=>`<span class="vr-attachment">${esc(a.name||'Attachment')}</span>`).join('')||'<span class="vr-muted">None</span>';
   return `<section class="vr-panel"><div class="vr-panelhead"><h2>Incident details</h2></div><div class="vr-panelbody"><div class="vr-facts">${fact('Incident ID',esc(r.id))}${fact('Status',badge(rStatus(r)))}${fact('Submitted by',esc(r.reporterName||'—'))}${fact('Submitted on',esc(rFmt(r.submittedAt)))}${fact('Affected people',esc(rNames(f)))}${inv.length?fact('Others involved',esc(inv.join(', '))):''}${fact('Incident type',esc(rClass(f)))}${fact('Severity',sevCell(f.severity))}${fact('Urgency',URG[f.urgency]||'Not answered')}${fact('Facility',esc(facOf(r.location)))}${fact('Service location',esc(svcName(r.location))+(f.place?' · '+esc(f.place):''))}${fact('Occurred',esc(rDisplayEvent(f)))}${f.programs.length?fact('Program',f.programs.map(esc).join(', ')):''}</div>
@@ -4085,6 +4269,27 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const sig=v.signatureImg?`<div class="inc-sig"><img src="${esc(v.signatureImg)}" alt="Signature of ${esc(v.signedBy||'reviewer')}"><small>Signed by ${esc(v.signedBy||'reviewer')}${v.signedAt?' · '+esc(rFmt(v.signedAt)):''}</small></div>`:'';
   return `<section class="vr-panel"><div class="vr-panelhead"><h2>Review</h2></div><div class="vr-panelbody">${body}${sig}</div></section>`;
  }
+ /* Compact submitted-report content for the reporter panel: no repeats of what the banner already shows. */
+ window.rpWhen=function(f){return f.eventDate?(f.eventTime?rFmt(f.eventDate+'T'+f.eventTime):rDate(f.eventDate)):'Not provided'};
+ window.rpSubmitted=function(r){
+  const f=r.form,has=v=>String(v||'').trim();
+  const lv=levels().find(x=>x.id===f.severity),col=(store.published&&store.published.colors)||{};
+  const sev=`<span class="rp-sev"><span class="tbl-sevdot" style="background:${esc(lv?(col[lv.id]||'#607D70'):'#a8b4bf')}" aria-hidden="true"></span>${esc(lv?lv.name:'Not sure')}</span>`;
+  const urg=({yes:'Urgent',no:'Not urgent',unknown:'Not sure'})[f.urgency]||'Not sure';
+  const type=(typeof rHasHidden==='function'&&rHasHidden(r))?'Incident details restricted':rShortClass(f);
+  const names=rNames(f),affected=names==='None named'?'None added':names;
+  const inv=[...(f.involvedPatients||[]).map(v=>rCanPatient(v)?(rPatient(v)||{}).name:'Patient details restricted'),...(f.involvedEmployees||[]).map(v=>(EMPLOYEES.find(e=>e.id===v)||{}).name||'Employee'),...(f.involvedOthers||[])];
+  if(f.involvedNone)inv.push('No person involved');else if(f.involvedUnknown)inv.push('Unknown person');
+  const involved=inv.length?inv.join(', '):'None added';
+  const fact=(l,v)=>`<div class="rp-fact"><small>${l}</small><span>${v}</span></div>`;
+  const text=(l,v)=>`<div class="rp-sec"><h5>${l}</h5>${has(v)?`<p>${esc(v)}</p>`:'<p class="rp-none">Not provided</p>'}</div>`;
+  const att=(f.attachments||[]).map(a=>`<span class="vr-attachment">${esc(a.name||'Attachment')}</span>`).join('');
+  const group=(t,b)=>`<div class="rp-group"><h4>${t}</h4>${b}</div>`;
+  return group('Incident details',`<div class="rp-facts4">${fact('Incident type',esc(type))}${fact('Severity',sev)}${fact('Urgency',esc(urg))}${fact('Date and time',esc(window.rpWhen(f)))}</div>${text('Description',f.description)}`)
+   +group('Affected people',`<p>${esc(affected)}</p>`)
+   +group('Involved people',`<p>${esc(involved)}</p>`)
+   +group('Other details',text('Injury details',f.injuryDetails)+text('Response details',f.responseDetails)+`<div class="rp-sec"><h5>Attachments</h5>${att?`<div class="vr-attachments">${att}</div>`:'<p class="rp-none">Not provided</p>'}</div>`);
+ };
  function ipFooter(r){
   if(ip.role!=='reviewer')return '';
   if(!incClaimable(r))return '';
@@ -4094,13 +4299,17 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  function ipHistory(r){
   return `<section class="vr-panel"><div class="vr-panelhead"><h2>History</h2></div><div class="vr-panelbody">${(r.timeline||[]).slice().reverse().map(t=>`<p class="mvp-history">${esc(t.text)}<small>${esc(rFmt(t.at))}</small></p>`).join('')||'<p class="vr-muted">No activity.</p>'}</div></section>`;
  }
+ function ipBar(r){
+  const title=ip.role==='reviewer'?'Review incident':'View incident',ctl=ip.role==='reviewer'&&typeof window.incReviewerBar==='function'?window.incReviewerBar(r):'';
+  return `<div class="vr14-drawerbar"><div><strong>${title}</strong></div>${ctl}<button type="button" data-ip="close" aria-label="Close">×</button></div>`;
+ }
  function ipDraw(){
   const old=document.getElementById('ip-overlay'),keep=old?.querySelector('.vr14-drawerbody')?.scrollTop||0,had=Boolean(old);
   old?.remove();document.getElementById('vr14-overlay')?.remove();
   if(!ip.id)return;
   const r=rState.reports.find(x=>x.id===ip.id);if(!r){ip.id=null;ip.role=null;return}
   const wrap=document.createElement('div');wrap.id='ip-overlay';wrap.className='vr14-overlay ip-overlay'+(ip.over?' ip-over':'');
-  wrap.innerHTML=`<div class="vr14-shade" data-ip="close"></div><section class="vr14-drawer" role="dialog" aria-modal="true" aria-label="${ip.role==='reviewer'?'Review':'View'} incident ${esc(r.id)}"><div class="vr14-drawerbar"><div><strong>${ip.role==='reviewer'?'Review incident':'View incident'}</strong></div><button type="button" data-ip="close" aria-label="Close">×</button></div><div class="vr14-drawerbody">${ipDetails(r)}${typeof incPanel==='function'?incPanel(r,ip.role):ipHistory(r)}</div>${ipFooter(r)}</section>`;
+  wrap.innerHTML=`<div class="vr14-shade" data-ip="close"></div><section class="vr14-drawer" role="dialog" aria-modal="true" aria-label="${ip.role==='reviewer'?'Review':'View'} incident ${esc(r.id)}">${ipBar(r)}<div class="vr14-drawerbody">${ip.role==='reviewer'&&typeof incReviewerPanel==='function'?incReviewerPanel(r):ip.role!=='reviewer'&&typeof incReporterPanel==='function'?incReporterPanel(r):ipDetails(r)+(typeof incPanel==='function'?incPanel(r,ip.role):ipHistory(r))}</div>${ipFooter(r)}</section>`;
   document.body.appendChild(wrap);
   const body=wrap.querySelector('.vr14-drawerbody');if(body)body.scrollTop=keep;
   if(!had)wrap.querySelector('.vr14-drawerbar [data-ip="close"]')?.focus({preventScroll:true});
@@ -4619,6 +4828,226 @@ body.c38-has-footer #content{padding-bottom:84px}
 .inc-widgets+.tbl-shell.u18-table-shell{min-height:430px!important;flex:none}
 .r-panel:has(>.inc-widgets){overflow-y:auto!important;min-height:0}
 
+/* Summary cards (My Reports and My Reviews): fixed height, title top-left, filters in a 3 x 2 grid, donut on the right. */
+.inc-widgets.inc-mini{--inc-card-radius:8px;--inc-card-h:116px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.95fr) minmax(0,1.4fr);gap:12px;margin:0 0 12px}
+@media(max-width:1100px){.inc-widgets.inc-mini{grid-template-columns:repeat(2,minmax(0,1fr))}.inc-widgets.inc-mini .inc-m-status{grid-column:1/-1}}
+@media(max-width:640px){.inc-widgets.inc-mini{grid-template-columns:minmax(0,1fr)}}
+.inc-m{display:flex;align-items:center;gap:12px;min-width:0;height:var(--inc-card-h,116px);box-sizing:border-box;padding:12px 14px;background:#fff;border:1px solid #d5dee6;border-radius:var(--inc-card-radius,8px)}
+.inc-m-main{flex:1;min-width:0;align-self:stretch;display:flex;flex-direction:column}
+.inc-m-head{display:flex;align-items:center;gap:8px;min-width:0;height:22px;margin:0 0 10px;flex:none}
+.inc-m h3{margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:600;line-height:18px;color:#2b4153}
+.inc-m-meta{flex:none;font-size:12px;color:#66747f;white-space:nowrap}
+.inc-m .inc-seg{margin-left:auto;flex:none;height:22px;box-sizing:border-box}
+.inc-m .inc-seg button{height:100%;padding:0 8px;line-height:1}
+.inc-m-grid{display:grid;grid-template-columns:repeat(3,minmax(0,auto));grid-auto-rows:24px;gap:6px 8px;justify-content:start;align-content:start;max-height:54px;overflow:auto}
+.inc-mcell{display:flex;align-items:center;gap:5px;height:24px;min-width:0;padding:0 9px;border:1px solid #dbe3ea;border-radius:12px;background:#fff;font:inherit;font-size:12px;color:#1f2d3c;cursor:pointer;white-space:nowrap;text-align:left}
+.inc-mcell .lab{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.inc-mcell .sep{flex:none;color:#8795a1}
+.inc-mcell b{flex:none;font-weight:600;font-variant-numeric:tabular-nums}
+.inc-mcell.zero{color:#66747f}
+.inc-mcell:hover{background:#f3f7fb;border-color:#9db4c8}
+.inc-mcell[aria-pressed="true"]{background:#eaf1f8;border-color:#1A4F85;color:#143f6b}
+.inc-mcell:focus-visible{outline:2px solid #1c75a2;outline-offset:-2px}
+.inc-m-dn{flex:none;width:68px;height:68px}
+.inc-m-dn .inc-dn{width:68px;height:68px}
+.inc-m-dn .inc-dn-c strong{font-size:15px;font-weight:600}
+.inc-m-dn .inc-dn-c span{display:none}
+.inc-m-colgrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.inc-mcol{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:4px 6px;border:1px solid transparent;border-radius:6px;background:transparent;font:inherit;cursor:pointer}
+.inc-mcol strong{font-size:24px;line-height:1.1;font-weight:600;color:#143f6b;font-variant-numeric:tabular-nums}
+.inc-mcol.hot strong{color:#b3303a}
+.inc-mcol.zero strong{color:#66747f}
+.inc-mcol span{font-size:12px;color:#44566a;white-space:nowrap}
+.inc-mcol:hover{background:#f3f7fb;border-color:#9db4c8}
+.inc-mcol[aria-pressed="true"]{background:#eaf1f8;border-color:#1A4F85}
+.inc-mcol:focus-visible{outline:2px solid #1c75a2;outline-offset:-2px}
+.tbl-clear{flex:none;height:36px;padding:0 6px;border:0;background:none;font:inherit;font-size:13px;font-weight:600;color:#285678;text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
+.tbl-clear:hover{color:#143f6b}
+.tbl-clear:focus-visible{outline:2px solid #1c75a2;outline-offset:2px;border-radius:2px}
+
+/* My Reviews table: compact id, bold type, popovers, advanced filters */
+.tbl-id{color:#44566a;font-variant-numeric:tabular-nums}
+.tbl-type{font-weight:600;color:#1b2f42}
+.tbl-trunc{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-people{display:flex;align-items:center;gap:6px;min-width:0}
+.tbl-people .tbl-trunc{flex:0 1 auto}
+.tbl-more{flex:none;height:22px;padding:0 7px;border:1px solid #cfdbe5;border-radius:11px;background:#fff;font:inherit;font-size:12px;font-weight:600;color:#285678;cursor:pointer}
+.tbl-more:hover,.tbl-more[aria-expanded="true"]{background:#eaf1f8;border-color:#1A4F85}
+.tbl-cellrow{display:flex;align-items:center;gap:4px;min-width:0}
+.tbl-table td .tbl-cellrow>.tbl-select.sm{width:150px;flex:none}
+.tbl-next{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl-next.late{color:#b3303a}
+.tbl-dash{color:#7a8895}
+.tbl-i{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;border:0;border-radius:50%;background:none;color:#5d7183;cursor:pointer}
+.tbl-i:hover,.tbl-i[aria-expanded="true"]{background:#eaf1f8;color:#1A4F85}
+.tbl-more:focus-visible,.tbl-i:focus-visible,.tbl-adv:focus-visible,.tbl-textlink:focus-visible{outline:2px solid #1c75a2;outline-offset:2px}
+.tbl-pop{position:fixed;z-index:1700;min-width:230px;max-width:340px;padding:12px 14px;background:#fff;border:1px solid #cdd9e3;border-radius:8px;box-shadow:0 10px 30px rgba(17,42,64,.18);font-size:12px;color:#1f2d3c;outline:0}
+.tbl-pop h4{margin:0 0 8px;font-size:12px;font-weight:600;color:#2b4153}
+.tbl-pop dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0}
+.tbl-pop dt{color:#66747f}
+.tbl-pop dd{margin:0;font-weight:500}
+.tbl-pop dd small{display:block;margin-top:1px;font-weight:400;color:#66747f}
+.tbl-pop dd.late{color:#b3303a}
+.tbl-pop-date{margin:0 0 10px;font-size:13px;font-weight:600;color:#1f2d3c}
+.tbl-pop-date.late{color:#b3303a}
+.tbl-pop-none{margin:0 0 10px;font-size:12px;color:#66747f}
+
+/* Report incident panel: 25% narrower, one row for the key fields, fixed footer */
+.rp-drawer{width:min(61.5vw,885px)!important}
+@media(max-width:1000px){.rp-drawer{width:92vw!important}}
+@media(max-width:700px){.rp-drawer{width:100vw!important}}
+.inc-row4{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(200px,1fr);gap:12px;align-items:start}
+@media(max-width:1199px){.inc-row4{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(200px,1.1fr)}.inc-row4>[data-ff="type"]{grid-column:1/-1}}
+@media(max-width:560px){.inc-row4{grid-template-columns:minmax(0,1fr)}}
+.inc-row4 input[type=datetime-local]{width:100%;min-width:0;font-size:12px;padding:0 8px}
+.inc-urgnote{margin:14px 0 0}
+.inc-desc{margin-top:16px}
+.csel{position:relative}
+.csel-btn{display:flex;align-items:center;gap:8px;width:100%;height:40px;box-sizing:border-box;padding:0 10px;border:1px solid var(--line-strong);border-radius:var(--radius-sm,8px);background:#fff;font:inherit;text-align:left;color:var(--ink);cursor:pointer}
+.csel-btn .inc-chev{margin-left:auto;flex:none;color:#5d7183}
+.csel-btn[aria-expanded="true"] .inc-chev{transform:rotate(180deg)}
+.csel-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.csel-val{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.csel-list{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:100%;margin:0;padding:4px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(14,34,56,.14);list-style:none}
+.csel-list[hidden]{display:none}
+.csel-list li{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.csel-list li[aria-selected="true"]{background:var(--brand-tint);font-weight:500}
+.csel-list li.is-active{background:#f0f5fa}
+.csel-list:focus-visible{outline:2px solid #247fb7;outline-offset:2px}
+.inc-pp-opts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 20px}
+.inc-opt{display:inline-flex;align-items:center;gap:8px;min-height:32px;font-size:13px;color:#1f2d3c;cursor:pointer}
+.inc-pp-sep{width:1px;height:20px;background:var(--line-strong)}
+.inc-pp-cells{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.rp-drawer>.rp-drawerbody{flex:1 1 auto;min-height:0}
+.rp-drawer>.rp-bar{flex:none;position:static;margin:0;padding:12px 24px;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:0 -4px 14px rgba(15,36,56,.06);background:#fff}
+.vr14-drawerbody:has(.rp-panel){padding-top:16px!important}
+.rp-barid{margin-left:10px;font-size:12px;font-weight:500;color:#66747f}
+.rp-panel{display:flex;flex-direction:column;gap:10px}
+.rp-banner{padding:14px 20px 12px;background:#fff;border:1px solid #d5dee6;border-radius:8px;text-align:left}
+.rp-key{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:12px}
+.rp-ki{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.rp-ki small{font-size:11px;line-height:1.2;color:#66747f}
+.rp-ki strong,.rp-ki b,.rp-sev{max-width:100%;font-size:13px;font-weight:600;line-height:20px;color:#1b2f42}
+.rp-ki strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-sev{display:inline-flex;align-items:center;gap:6px}
+.rp-steps{display:flex;align-items:flex-start;margin:16px 0 0;padding:18px 0 4px;border-top:1px solid #e3e9ee;list-style:none}
+.rp-step{position:relative;flex:1 1 0;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;padding-right:14px;text-align:left}
+.rp-step:last-child{flex:none;align-items:flex-end;min-width:92px;padding-right:0;text-align:right}
+.rp-step::after{content:"";position:absolute;top:7px;left:26px;right:10px;height:2px;background:#d5dee6}
+.rp-step:last-child::after{display:none}
+.rp-step.st-done::after{background:#1A4F85}
+.rp-step.st-notreq::after,.rp-step.st-na::after,.rp-step.st-rejected::after{height:0;background:none;border-top:2px dashed #d5dee6}
+.rp-dot{position:relative;z-index:1;width:16px;height:16px;box-sizing:border-box;border-radius:50%;background:#fff;border:2px solid #c3cfda}
+.rp-step.st-done .rp-dot{background:#1A4F85;border-color:#1A4F85}
+.rp-step.st-current .rp-dot{border-color:#1A4F85;box-shadow:0 0 0 3px #dbe8f4}
+.rp-step.st-rejected .rp-dot{border-color:#b3303a;box-shadow:0 0 0 3px #f6dcdc}
+.rp-step.st-notreq .rp-dot,.rp-step.st-na .rp-dot{border-style:dashed}
+.rp-lab{display:block;font-size:13px;line-height:18px;color:#44566a}
+.rp-step.st-current .rp-lab{font-weight:600;color:#143f6b}
+.rp-step.st-rejected .rp-lab{color:#b3303a}
+.rp-step.st-notreq .rp-lab,.rp-step.st-na .rp-lab{color:#8795a1}
+.rp-date{display:block;min-height:16px;font-size:12px;line-height:16px;color:#66747f}
+.rp-step.st-notreq .rp-date{font-style:italic}
+.rp-group{margin-top:12px;padding-top:12px;border-top:1px solid #edf1f4}
+.rp-group:first-child{margin-top:0;padding-top:10px;border-top:0}
+.rp-group>h4{margin:0 0 8px;font-size:12px;font-weight:600;color:#2b4153}
+.rp-group>p{margin:0;font-size:13px;line-height:1.5;color:#1f2d3c;overflow-wrap:anywhere}
+.rp-facts4{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr);gap:12px;margin:0 0 10px}
+.rp-group .rp-sec{margin:0 0 10px}
+.rp-group .rp-sec:last-child{margin-bottom:0}
+.rp-sec h5{margin:0 0 3px;font-size:11px;font-weight:500;color:#66747f}
+.rp-none{color:#8795a1!important}
+
+/* Review panel header controls and compact dialogs */
+.vr14-drawerbar .rp-barctl{display:flex;align-items:center;gap:14px;margin-left:auto;margin-right:12px}
+.vr14-drawerbar .rp-barctl button{width:auto;height:auto;font-size:13px;line-height:1.3;border-radius:4px;background:none}
+.vr14-drawerbar .rp-barctl .inc-textbtn{padding:8px 6px;color:#1A4F85;font-weight:600}
+.vr14-drawerbar .rp-barctl button:disabled{opacity:.5;cursor:not-allowed}
+.rp-barctl .tbl-field{width:250px}
+#modal-root .dialog.dialog-compact{width:440px!important;max-width:calc(100vw - 32px)!important}
+#modal-root .dialog.dialog-compact.dialog-edit{width:620px!important}
+.dialog-compact .dialoghead{padding:16px 20px}
+.dialog-compact .dialoghead h2{font-size:17px}
+.dialog-compact .dialogbody{padding:16px 20px}
+.dialog-compact .dialogfoot{padding:12px 20px;justify-content:flex-end}
+.v32-info{display:flex;flex-direction:column;gap:2px;margin:0 0 14px;padding:10px 12px;background:#f7f9fb;border:1px solid #e1e8ee;border-radius:6px}
+.v32-info strong{font-size:13px;color:#1b2f42}
+.v32-info span{font-size:12px;color:#66747f}
+.rv-body .rv-line{margin:0 0 12px;font-size:13px;color:#44566a}
+.rv-body .rv-f{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;min-width:0}
+.rv-body .v32-input{width:100%;box-sizing:border-box}
+.rv-body select.v32-input{appearance:none;-webkit-appearance:none;padding-right:34px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A5668' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center/12px}
+.rv-row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rv-row2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#modal-root .backdrop{z-index:2100}
+
+/* All right-hand panels share one background */
+.rp-drawer,.rp-drawerbody,.vr14-drawer,.vr14-drawerbody,.dialog:not(.center),.dialog:not(.center) .dialogbody{background:#FAFAFA!important}
+@media(max-width:700px){.rp-key,.rp-facts4{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-lab{min-height:32px}}
+.rp-acc{background:#fff;border:1px solid #d5dee6;border-radius:8px;overflow:hidden}
+.rp-acc h3{margin:0}
+.rp-acc-head{display:flex;align-items:center}
+.rp-acc-head h3{flex:1;min-width:0}
+.rp-acc-act{flex:none;display:flex;align-items:center;padding:0 14px 0 6px}
+.rp-count{flex:none;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#edf2f6;color:#44566a;font-size:11px;font-weight:600;line-height:20px;text-align:center;box-sizing:border-box}
+.rp-rv-side{display:flex;align-items:center;gap:10px;flex:none}
+.rp-acc-btn{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:0 14px;border:0;background:none;font:inherit;text-align:left;cursor:pointer}
+.rp-acc-btn .inc-chev{flex:none;color:#5d7183}
+.rp-acc-btn[aria-expanded="false"] .inc-chev{transform:rotate(-90deg)}
+.rp-acc-btn:hover{background:none}
+.rp-acc-head:hover{background:#f6f9fc}
+.rp-acc-btn:focus-visible{outline:2px solid #1c75a2;outline-offset:-2px}
+.rp-acc-title{flex:none;font-size:13px;font-weight:600;color:#2b4153}
+.rp-acc-sum{flex:1;min-width:0;margin-left:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;font-size:12px;color:#66747f}
+.rp-acc-body{padding:2px 14px 14px;border-top:1px solid #edf1f4}
+.rp-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin:12px 0 2px}
+.rp-fact small{display:block;margin-bottom:1px;font-size:11px;color:#66747f}
+.rp-fact span{font-size:13px;color:#1f2d3c;overflow-wrap:anywhere}
+.rp-sec{margin-top:12px}
+.rp-sec h4{margin:0 0 3px;font-size:12px;font-weight:600;color:#2b4153}
+.rp-sec p{margin:0;font-size:13px;line-height:1.5;color:#1f2d3c;overflow-wrap:anywhere}
+.rp-list{margin:6px 0 0;padding:0;list-style:none}
+.rp-rv,.rp-act{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #edf1f4}
+.rp-rv:first-child,.rp-act:first-child{border-top:0}
+.rp-rv strong,.rp-act strong{display:block;font-size:13px;font-weight:600;color:#1f2d3c}
+.rp-rv small,.rp-act small{display:block;margin-top:1px;font-size:12px;color:#66747f}
+.rp-act-side{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;flex:none;max-width:55%}
+.rp-muted{margin:10px 0 0;font-size:12px;color:#66747f}
+.rp-act-side .tbl-btn{margin-left:4px}
+.rp-panel .inc-note-form{margin:8px 0 12px}
+.rp-note{margin:10px 0 0;font-size:12px;color:#b3303a}
+.rp-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:10px 0 0;font-size:13px}
+.rp-dl dt{color:#66747f}
+.rp-dl dd{margin:0;color:#1f2d3c;overflow-wrap:anywhere}
+.rp-dl dd small{display:block;font-size:12px;color:#66747f}
+.rp-note-item{padding:9px 0;border-top:1px solid #edf1f4}
+.rp-note-item:first-child{border-top:0}
+.rp-note-item p{margin:0 0 2px;font-size:13px;line-height:1.45;color:#1f2d3c;overflow-wrap:anywhere}
+.rp-note-item small{font-size:12px;color:#66747f}
+.rp-hist{position:relative;margin:10px 0 0;padding:0 0 0 18px;list-style:none}
+.rp-hist::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:#dbe3ea}
+.rp-hist li{position:relative;padding:0 0 12px}
+.rp-hist li:last-child{padding-bottom:0}
+.rp-hdot{position:absolute;left:-18px;top:4px;width:12px;height:12px;box-sizing:border-box;border-radius:50%;background:#fff;border:2px solid #1A4F85}
+.rp-hist li:first-child .rp-hdot{background:#1A4F85}
+.rp-hist p{margin:0;font-size:13px;line-height:1.4;color:#1f2d3c}
+.rp-hist small{font-size:12px;color:#66747f}
+.tbl-pop ul{margin:0;padding:0;list-style:none}
+.tbl-pop li{padding:4px 0;border-top:1px solid #edf1f4}
+.tbl-pop li:first-child{border-top:0}
+.tbl-pop-adv{width:420px;max-width:calc(100vw - 16px)}
+.tbl-adv-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 10px}
+.tbl-adv-head strong{font-size:13px;font-weight:600;color:#2b4153}
+.tbl-textlink{background:none;border:0;padding:2px 4px;font:inherit;font-size:12px;font-weight:600;color:#285678;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.tbl-adv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.tbl-adv-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tbl-adv-f>span{font-size:12px;color:#66747f}
+.tbl-adv-f select,.tbl-adv-f input{height:34px;min-width:0;border:1px solid #d0dbe3;border-radius:4px;background:#fff;padding:0 8px;font:inherit;font-size:12px;color:#1f2d3c}
+.tbl-adv-check{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:12px;color:#1f2d3c}
+.tbl-adv{margin-left:auto;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;border:1px solid #d0dbe3;border-radius:4px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:#285678;cursor:pointer;white-space:nowrap}
+.tbl-adv:hover,.tbl-adv[aria-expanded="true"]{background:#eaf1f8;border-color:#9db4c8}
+.tbl-adv b{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#1A4F85;color:#fff;font-size:11px;font-weight:600}
+
 /* Signature dialog: compact, with a drawing pad. */
 #modal-root .dialog.center:has(.v32-modal-content){width:min(440px,calc(100vw - 32px))!important;max-width:none!important}
 .v32-modal-content{max-width:none;gap:10px}
@@ -4654,43 +5083,71 @@ body.c38-has-footer #content{padding-bottom:84px}
   const arcs=live.map(x=>{const len=x.n/t*C,seg=Math.max(len-gap,.6),el=`<circle cx="60" cy="60" r="${R}" fill="none" stroke="${esc(x.color)}" stroke-width="14" stroke-dasharray="${seg.toFixed(2)} ${(C-seg).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(x.label)}: ${x.n}</title></circle>`;off+=len;return el}).join('');
   return `<div class="inc-dn" role="img" aria-label="${esc(items.map(x=>`${x.label} ${x.n}`).join(', '))}"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="${R}" fill="none" stroke="#e9eef2" stroke-width="14"/><g transform="rotate(-90 60 60)">${arcs}</g></svg><div class="inc-dn-c${warn&&n?' warn':''}${n?'':' none'}"><strong>${n}</strong><span>${esc(unit)}</span></div></div>`;
  }
- const legend=items=>{const t=total(items);return `<ul class="inc-lg">${items.map(x=>`<li class="${x.n?'':'zero'}"><span class="inc-w-dot" style="background:${esc(x.color)}" aria-hidden="true"></span><span class="lab" title="${esc(x.label)}">${esc(x.label)}</span><b>${x.n}</b><span class="pct">${t&&x.n?Math.round(x.n/t*100)+'%':''}</span></li>`).join('')}</ul>`};
- const card=({icon:ic,title,n,unit,items,foot,warn,meta,head})=>`<section class="inc-w" aria-label="${esc(title)}"><div class="inc-w-head"><span class="inc-w-ico${warn?' warn':''}">${icon(ic,16)}</span><h3>${esc(title)}</h3>${meta?`<span class="inc-w-meta">${esc(meta)}</span>`:''}${head||''}</div><div class="inc-w-body">${donut(items,n,unit,warn)}${legend(items)}</div>${foot||''}</section>`;
- const columnsCard=({icon:ic,title,items,head})=>`<section class="inc-w" aria-label="${esc(title)}"><div class="inc-w-head"><span class="inc-w-ico">${icon(ic,16)}</span><h3>${esc(title)}</h3>${head||''}</div><div class="inc-cols" role="group" aria-label="${esc(title)}">${items.map(x=>`<div class="inc-col"><strong class="${x.hot&&x.n?'hot':''}">${x.n}</strong><span>${esc(x.label)}</span></div>`).join('')}</div></section>`;
  let wmode='severity';
  const switcher=()=>`<div class="inc-seg" role="group" aria-label="Break down by">${[['severity','Severity'],['urgency','Urgency']].map(([k,l])=>`<button type="button" data-inc-wmode="${k}" aria-pressed="${wmode===k?'true':'false'}">${l}</button>`).join('')}</div>`;
- const urgFoot=list=>`<div class="inc-w-foot"><small>By urgency</small>${urgItems(list).map(x=>`<span class="inc-chip${x.label==='Urgent'&&x.n?' hot':''}"><span>${esc(x.label)}</span><b>${x.n}</b></span>`).join('')}</div>`;
-
  const STATUS_COLOR={'Reported':'#2d6bb5','In Review':'#d49a1a','Follow up pending':'#2a8fa6','Follow up completed':'#1d8a58','Closed':'#7a8da0','Rejected':'#c5424a'};
- function reportsCards(){
-  const mine=rOwn();
-  const stat=Object.keys(STATUS_COLOR).map(k=>({label:k,color:STATUS_COLOR[k],n:mine.filter(r=>incStatus(r)===k).length}));
-  const urg=urgItems(mine).map(x=>({...x,hot:x.label==='Urgent'}));
-  return card({icon:'severity',title:'Reports by severity',n:mine.length,unit:'reports',items:sevItems(mine,true)})
-   +columnsCard({icon:'bell',title:'Reports by urgency',items:urg})
-   +card({icon:'list',title:'Reports by status',n:mine.length,unit:'reports',items:stat});
+  const REP_STATUS=Object.keys(STATUS_COLOR);
+ const cell=(field,x,on)=>`<button type="button" class="inc-mcell${x.n?'':' zero'}" data-inc-f="${field}" data-inc-v="${esc(x.id)}" aria-pressed="${on?'true':'false'}" title="${esc(x.full||x.label)}: ${x.n}"><span class="inc-w-dot" style="background:${esc(x.color)}" aria-hidden="true"></span><span class="lab">${esc(x.label)}</span><span class="sep" aria-hidden="true">-</span><b>${x.n}</b></button>`;
+ /* One fixed-size card: title top-left, up to six clickable filters in a 3 x 2 grid, donut on the right. */
+ const colBtn=(field,x,on)=>`<button type="button" class="inc-mcol${x.id==='yes'&&x.n?' hot':''}${x.n?'':' zero'}" data-inc-f="${field}" data-inc-v="${esc(x.id)}" aria-pressed="${on?'true':'false'}" title="${esc(x.full||x.label)}: ${x.n}"><strong>${x.n}</strong><span>${esc(x.label)}</span></button>`;
+ function miniCard({cls,title,field,total,items,current,meta,head,warn,cols}){
+  const top=`<div class="inc-m-head"><h3 title="${esc(title)}">${esc(title)}</h3>${meta?`<span class="inc-m-meta">${esc(meta)}</span>`:''}${head||''}</div>`;
+  const label=`Filter the table: ${esc(title)}`;
+  if(cols)return `<section class="inc-m ${cls} inc-m-cols" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-colgrid" role="group" aria-label="${label}">${items.map(x=>colBtn(field,x,current===x.id)).join('')}</div></div></section>`;
+  return `<section class="inc-m ${cls}" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-grid" role="group" aria-label="${label}">${items.map(x=>cell(field,x,current===x.id)).join('')}</div></div><div class="inc-m-dn">${donut(items,total,'',warn)}</div></section>`;
  }
+ const idsFromLevels=(items,lv)=>items.map((x,i)=>({...x,id:i<lv.length?lv[i].id:'none'}));
+ const URG_IDS=['yes','no','unknown'];
+ const urgWithIds=list=>urgItems(list).map((x,i)=>({...x,id:URG_IDS[i]}));
+ const wrap=(kind,label,cards)=>`<div class="inc-widgets inc-mini" data-inc-kind="${kind}" data-sig="${esc(JSON.stringify(window.incFilters.get(kind)))}" role="group" aria-label="${label}">${cards}</div>`;
+ function reportsMini(){
+  const mine=rOwn(),open=mine.filter(r=>!['Closed','Rejected'].includes(incStatus(r))),f=window.incFilters.get('reports'),lv=levels();
+  const stat=REP_STATUS.map(k=>({id:k,label:k,color:STATUS_COLOR[k],n:mine.filter(r=>incStatus(r)===k).length}));
+  return wrap('reports','My Reports summary',
+   miniCard({cls:'inc-m-sev',title:'Open reports by severity',field:'severity',total:open.length,items:idsFromLevels(sevItems(open,true),lv),current:f.severity})
+   +miniCard({cls:'inc-m-urg',title:'Open reports by urgency',field:'urgency',total:open.length,items:urgWithIds(open),current:f.urgency,cols:true})
+   +miniCard({cls:'inc-m-status',title:'Reports by status',field:'status',total:mine.length,items:stat,current:f.tab}));
+ }
+ /* Reviewer stages. The cards and the table filter use these same rules, so a count always matches the rows it opens. */
+ const vv=r=>r.mvpReview||{};
+ const isOpen=r=>!['Closed','Rejected'].includes(incStatus(r));
+ const fupLate=r=>typeof incOverdueActions==='function'&&incOverdueActions([r])>0;
+ const PRED={
+  overNotAccepted:r=>incStatus(r)==='Reported'&&rIsOverdue(r),
+  overNotDone:r=>incStatus(r)==='In Review'&&rIsOverdue(r),
+  waiting:r=>isOpen(r)&&incClaimable(r)&&!vv(r).firstCompleted,
+  reviewing:r=>isOpen(r)&&incStatus(r)==='In Review'&&Boolean(vv(r).owner),
+  second:r=>isOpen(r)&&incStatus(r)==='In Review'&&Boolean(vv(r).firstCompleted)&&!vv(r).owner,
+  fupPending:r=>incStatus(r)==='Follow up pending'&&!fupLate(r),
+  fupLate:r=>incStatus(r)==='Follow up pending'&&fupLate(r),
+  fupDone:r=>incStatus(r)==='Follow up completed'
+ };
+ window.incPreds=PRED;
  function reviewsCards(){
-  const all=vrList(),stat=r=>incStatus(r);
-  const open=all.filter(r=>!['Closed','Rejected'].includes(stat(r)));
-  const active=all.filter(r=>['Reported','In Review'].includes(stat(r)));
-  const overdue=active.filter(r=>rIsOverdue(r));
-  const notAccepted=overdue.filter(r=>stat(r)==='Reported').length,notDone=overdue.length-notAccepted;
-  const v=r=>r.mvpReview||{};
-  const waiting=open.filter(r=>incClaimable(r)&&!v(r).firstCompleted).length;
-  const second=open.filter(r=>stat(r)==='In Review'&&v(r).firstCompleted&&!v(r).owner).length;
-  const reviewing=open.filter(r=>stat(r)==='In Review'&&v(r).owner).length;
-  const fup=open.filter(r=>stat(r)==='Follow up pending'),fupLate=fup.filter(r=>typeof incOverdueActions==='function'&&incOverdueActions([r])>0).length;
-  const stages=[{label:'Waiting to be accepted',color:STATUS_COLOR['Reported'],n:waiting},{label:'In review',color:STATUS_COLOR['In Review'],n:reviewing},{label:'Waiting for second reviewer',color:COLOR.second,n:second},{label:'Follow up pending',color:STATUS_COLOR['Follow up pending'],n:fup.length-fupLate},{label:'Follow up overdue',color:COLOR.overdue,n:fupLate},{label:'Follow up completed',color:STATUS_COLOR['Follow up completed'],n:open.filter(r=>stat(r)==='Follow up completed').length}];
+  const all=vrList(),f=window.incFilters.get('reviews'),lv=levels(),open=all.filter(isOpen),n=k=>all.filter(PRED[k]).length;
+  const overdue=[['overNotAccepted','Not accepted','Not accepted in time',COLOR.overdue],['overNotDone','Not completed','Review not completed in time','#d98a2b']].map(([id,label,full,color])=>({id,label,full,color,n:n(id)}));
+  const stages=[['waiting','To be accepted','Waiting to be accepted',STATUS_COLOR['Reported']],['reviewing','In review','In review',STATUS_COLOR['In Review']],['second','2nd reviewer needed','Waiting for second reviewer',COLOR.second],['fupPending','Follow up pending','Follow up pending',STATUS_COLOR['Follow up pending']],['fupLate','Follow up overdue','Follow up overdue',COLOR.overdue],['fupDone','Follow up completed','Follow up completed',STATUS_COLOR['Follow up completed']]].map(([id,label,full,color])=>({id,label,full,color,n:n(id)}));
   const first=wmode==='urgency'
-   ?columnsCard({icon:'bell',title:'Open reports by urgency',items:urgItems(open).map(x=>({...x,hot:x.label==='Urgent'})),head:switcher()})
-   :card({icon:'severity',title:'Open reports by severity',n:open.length,unit:'open',items:sevItems(open,true),head:switcher()});
+   ?miniCard({cls:'inc-m-urg',title:'Open reports by urgency',field:'urgency',total:open.length,items:urgWithIds(open),current:f.urgency,head:switcher(),cols:true})
+   :miniCard({cls:'inc-m-sev',title:'Open reports by severity',field:'severity',total:open.length,items:idsFromLevels(sevItems(open,true),lv),current:f.severity,head:switcher()});
+  const active=all.filter(r=>['Reported','In Review'].includes(incStatus(r))).length;
   return first
-   +card({icon:'warning',title:'Overdue reports',n:overdue.length,unit:'overdue',items:[{label:'Not accepted in time',color:COLOR.overdue,n:notAccepted},{label:'Review not completed in time',color:'#d98a2b',n:notDone}],warn:true,meta:`of ${active.length} open`})
-   +card({icon:'pen',title:'Awaiting actions',n:total(stages),unit:'reports',items:stages});
+   +miniCard({cls:'inc-m-over',title:'Overdue reports',field:'quick',total:total(overdue),items:overdue,current:f.quick,warn:true,meta:`of ${active} open`})
+   +miniCard({cls:'inc-m-status',title:'Awaiting actions',field:'quick',total:total(stages),items:stages,current:f.quick});
  }
+ window.incSync=function(kind){
+  const g=document.querySelector('.inc-widgets[data-inc-kind="'+kind+'"]');
+  if(g&&g.dataset.sig!==JSON.stringify(window.incFilters.get(kind)))g.outerHTML=incWidgets(kind);
+ };
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-inc-f]');if(!b)return;
+  const g=b.closest('.inc-widgets');if(!g)return;
+  e.preventDefault();const kind=g.dataset.incKind,field=b.dataset.incF,val=b.dataset.incV;
+  window.incFilters.toggle(kind,field,val);
+  document.querySelector('.inc-widgets[data-inc-kind="'+kind+'"] [data-inc-f="'+field+'"][data-inc-v="'+val+'"]')?.focus({preventScroll:true});
+ });
  window.incWidgets=function(kind){
-  try{return `<div class="inc-widgets" data-inc-kind="${kind}" role="group" aria-label="${kind==='reports'?'My Reports':'My Reviews'} summary">${kind==='reports'?reportsCards():reviewsCards()}</div>`}catch(e){return ''}
+  try{return kind==='reports'?reportsMini():wrap('reviews','My Reviews summary',reviewsCards())}catch(e){console.error(e);return ''}
  };
 
  document.addEventListener('click',e=>{
@@ -4874,6 +5331,7 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
 
  /* ---- helpers for the panel ---- */
  const status=r=>incStatus(r);
+ const actionable=r=>status(r)==='Follow up pending';
  const actStatus=(r,a)=>a.completedAt?'Completed':POST.includes(status(r))?'Pending':'Not started';
  function actDue(a){
   if(a.completedAt){if(a.startAt&&a.sla){const late=new Date(a.completedAt)>new Date(rDue(a.startAt,a.sla));return {text:late?'Completed late':'Completed on time',tone:late?'late':'done'}}return {text:'Completed',tone:'done'}}
@@ -4942,6 +5400,213 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
   return accordion('history','History',items.length,items.map(t=>`<p class="mvp-history">${esc(t.text)}<small>${esc(rFmt(t.at))}</small></p>`).join('')||'<p class="vr-muted">No activity.</p>');
  }
  window.incOverdueActions=function(list){let n=0;list.forEach(r=>{if(status(r)!=='Follow up pending')return;(r.mvpActions||[]).forEach(a=>{if(a.completedAt||!a.startAt||!a.sla)return;if(new Date(rDue(a.startAt,a.sla))<rNow())n++})});return n};
+
+ /* ===== Reporter's View incident panel: banner with progress, then collapsible sections (all read-only) ===== */
+ const RP_STEPS=['Reported','In Review','Follow up pending','Follow up completed','Closed'];
+ const rpAccOpen={};
+ const rpSev=v=>{const l=levels().find(x=>x.id===v),c=(store.published&&store.published.colors)||{},name=l?l.name:'Not sure',color=l?(c[l.id]||'#607D70'):'#a8b4bf';return `<span class="rp-sev"><span class="tbl-sevdot" style="background:${esc(color)}" aria-hidden="true"></span>${esc(name)}</span>`};
+ /* When each status was reached. Read from the history first, then from the report's own dates. */
+ function rpDates(r){
+  const v=r.mvpReview||{},log=r.timeline||[];
+  const last=re=>{for(let i=log.length-1;i>=0;i--)if(re.test(String(log[i].text||'')))return log[i].at;return null};
+  return {
+   'Reported':r.submittedAt,
+   'In Review':last(/^(?:Review (?:claimed|accepted) by|Report moved back to In Review by)/i)||r.acceptedAt||v.claimedAt||null,
+   'Follow up pending':last(/^(?:Report )?(?:approved|acknowledged) by|^Status changed to Follow up pending by/i)||r.reviewCompletedAt||v.decidedAt||v.signedAt||null,
+   'Follow up completed':last(/^Status changed to Follow up completed by/i),
+   'Closed':last(/^Status changed to Closed by/i),
+   'Rejected':last(/^(?:Report )?rejected by/i)||v.decidedAt||null
+  };
+ }
+ /* The timeline always has the same five slots in the same places, so every incident reads the same way.
+    Follow-up slots are muted as "Not required" when a report has no follow-up actions.
+    A rejected report shows Rejected in the second slot and the rest muted. */
+ function rpSlots(r){
+  const s=status(r),rejected=s==='Rejected',inFollow=s==='Follow up pending'||s==='Follow up completed';
+  const hasFollow=((r.mvpActions||[]).length||(vr12Step(r).actions||[]).length)>0||inFollow,cur=RP_STEPS.indexOf(s);
+  return RP_STEPS.map((k,i)=>{
+   if(rejected)return i===0?{k,state:'done'}:i===1?{k:'Rejected',state:'current',rejected:true}:{k,state:'na'};
+   if((k==='Follow up pending'||k==='Follow up completed')&&!hasFollow)return {k,state:'notreq'};
+   return {k,state:i<cur?'done':i===cur?'current':'todo'};
+  });
+ }
+ function rpBanner(r){
+  const f=r.form,dates=rpDates(r);
+  const type=(typeof rHasHidden==='function'&&rHasHidden(r))?'Incident details restricted':rShortClass(f);
+  const urg=({yes:'Urgent',no:'Not urgent',unknown:'Not sure'})[f.urgency]||'Not sure';
+  const words={done:'completed',current:'current step',todo:'upcoming',notreq:'not required',na:'not applicable'};
+  const items=rpSlots(r).map(x=>{
+   const d=(x.state==='done'||x.state==='current')&&dates[x.k]?rFmt(dates[x.k]):x.state==='notreq'?'Not required':'';
+   return `<li class="rp-step st-${x.state}${x.rejected?' st-rejected':''}"${x.state==='current'?' aria-current="step"':''}><span class="rp-dot" aria-hidden="true"></span><span class="rp-lab">${esc(x.k)}<span class="sr-only"> (${words[x.state]})</span></span><small class="rp-date">${d?esc(d):'&nbsp;'}</small></li>`;
+  }).join('');
+  return `<section class="rp-banner" aria-label="Incident summary"><div class="rp-key"><div class="rp-ki"><small>Incident type</small><strong title="${esc(type)}">${esc(type)}</strong></div><div class="rp-ki"><small>Severity</small>${rpSev(f.severity)}</div><div class="rp-ki"><small>Urgency</small><b>${esc(urg)}</b></div><div class="rp-ki"><small>Date and time</small><b>${esc(window.rpWhen(f))}</b></div></div><ol class="rp-steps" aria-label="Report progress">${items}</ol></section>`;
+ }
+ const rpAcc=(id,key,title,summary,body,o={})=>{
+  const open=Boolean(rpAccOpen[id]&&rpAccOpen[id][key]);
+  const badge=o.count!=null?`<span class="rp-count" aria-label="${o.count} ${o.count===1?'entry':'entries'}">${o.count}</span>`:'';
+  return `<section class="rp-acc"><div class="rp-acc-head"><h3><button type="button" class="rp-acc-btn" data-rp-acc="${key}" aria-expanded="${open}" aria-controls="rp-${key}">${chev}<span class="rp-acc-title">${title}</span>${badge}<span class="rp-acc-sum">${esc(summary)}</span></button></h3>${o.action?`<span class="rp-acc-act">${o.action}</span>`:''}</div><div class="rp-acc-body" id="rp-${key}"${open?'':' hidden'}>${body}</div></section>`;
+ };
+ /* Reviews: whether each review is signed, by whom and when. The signature itself is not shown. */
+ function rpReviews(r,rev){
+  const v=r.mvpReview||{},step=vr12Step(r),two=Boolean(step.second),reviews=v.reviews||[],rejected=status(r)==='Rejected'&&!reviews.length;
+  const cur=(two&&v.firstCompleted)?2:1;
+  const rows=(two?[1,2]:[1]).map(n=>{
+   const cfg=n===1?step.first:step.second,e=reviews[n-1],title=two?(n===1?'First review':'Second review'):'Review';
+   if(e){
+    const signed=Boolean(e.signatureImg),verb=e.outcome==='acknowledged'?'Acknowledged':'Approved';
+    return `<li class="rp-rv"><div><strong>${title}</strong><small>${esc(e.name)} · ${esc(rFmt(e.at))}${!signed&&cfg&&cfg.signature===false?' · No signature required':''}</small></div>${pill(signed?'Signed':verb,'done')}</li>`;
+   }
+   const mine=n===cur&&v.owner&&status(r)==='In Review';
+   const line=rejected?'Not reviewed':n===2&&!reviews[0]?'Starts after the first review':mine?`In review by ${v.owner}`:`Waiting for ${groupName(cfg&&cfg.group)}`;
+   const verb=cfg&&cfg.response==='acknowledgment'?'Acknowledge':'Approve';
+   const btn=rev&&mine?`<button type="button" class="btn primary small" data-mvp="approve" data-id="${esc(r.id)}">${cfg&&cfg.signature?'Sign and '+verb.toLowerCase():verb}</button>`:'';
+   return `<li class="rp-rv"><div><strong>${title}</strong><small>${esc(line)}</small></div><div class="rp-rv-side">${pill(cfg&&cfg.signature===false?'Pending':'Not signed yet','')}${btn}</div></li>`;
+  }).join('');
+  const note=rejected?`<p class="rp-note">Rejected${v.decidedAt?' on '+esc(rFmt(v.decidedAt)):''}. Reason: ${esc(v.reason||'Not recorded')}</p>`:'';
+  const total=two?2:1,noSig=step.first&&step.first.signature===false&&(!two||(step.second&&step.second.signature===false));
+  return {sum:rejected?'Rejected':`${Math.min(reviews.length,total)} of ${total} ${noSig?'completed':'signed'}`,count:reviews.length,body:`${note}<ul class="rp-list">${rows}</ul>`};
+ }
+ function rpActions(r,rev){
+  incSnapshot(r);const list=r.mvpActions||[],s=status(r),v=r.mvpReview||{};
+  const canAdd=rev&&['Follow up pending','Follow up completed'].includes(s);
+  const tip=canAdd?'':(s==='Rejected'?'A rejected report has no follow-up actions.':s==='Closed'?'This report is closed.':'Available after the report is signed off.');
+  const action=rev?`<button type="button" class="inc-textbtn" data-inc-add="${esc(r.id)}" ${canAdd?'':'disabled'} title="${esc(tip)}">+ Add action</button>`:'';
+  if(s==='Rejected')return {sum:'None',count:0,action,body:'<p class="rp-muted">No follow-up actions. This report was rejected.</p>'};
+  if(!list.length)return {sum:'None',count:0,action,body:'<p class="rp-muted">No follow-up actions are defined for this report.</p>'};
+  const req=list.filter(a=>a.required),done=req.filter(a=>a.completedAt).length;
+  const open=actionable(r),lock=open?'':(POST.includes(s)?'Actions are locked once the report is '+s+'.':'Available after the report is signed off and in Follow up pending.');
+  const rows=list.map(a=>{
+   const st=actStatus(r,a),due=actDue(a),fin=Boolean(a.completedAt);
+   const nameTip=a.manual?`${a.title} — added ${rFmt(a.addedAt)} by ${a.addedBy||'reviewer'}`:a.title;
+   const stTip=fin?`Completed ${rFmt(a.completedAt)} by ${a.completedBy||'reviewer'}`:'';
+   const btn=rev?`<td class="inc-r">${fin?`<button type="button" class="tbl-btn" data-inc-undo="${esc(r.id)}" data-act="${esc(a.id)}" aria-label="Undo completion: ${esc(a.title)}" ${open?'':'disabled'} title="${esc(lock)}">Undo</button>`:`<button type="button" class="tbl-btn primary" data-inc-complete="${esc(r.id)}" data-act="${esc(a.id)}" aria-label="Mark complete: ${esc(a.title)}" ${open?'':'disabled'} title="${esc(lock)}">Mark complete</button>`}</td>`:'';
+   return `<tr><td><span class="inc-cellflex"><span class="inc-trunc" title="${esc(nameTip)}">${esc(a.title)}</span>${a.manual?'<span class="inc-tag ghost">Added manually</span>':''}</span></td><td title="${esc(groupName(a.group))}">${esc(groupName(a.group))}</td><td>${a.required?'Yes':'No'}</td><td title="${esc(stTip)}">${pill(st,st==='Completed'?'done':st==='Pending'?'warn':'')}</td><td>${pill(due.text,due.tone)}</td>${btn}</tr>`;
+  }).join('');
+  const cols=rev?'<col><col style="width:170px"><col style="width:76px"><col style="width:104px"><col style="width:200px"><col style="width:130px">':'<col><col style="width:170px"><col style="width:76px"><col style="width:104px"><col style="width:200px">';
+  const table=`<div class="inc-tblwrap"><table class="inc-act-table"><colgroup>${cols}</colgroup><thead><tr><th scope="col">Action type</th><th scope="col">Responsible group</th><th scope="col">Required</th><th scope="col">Status</th><th scope="col">SLA</th>${rev?'<th scope="col" class="inc-r">Actions</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  return {sum:req.length?`${done} of ${req.length} required completed`:`${list.length} ${list.length===1?'action':'actions'}`,count:list.length,action,body:table};
+ }
+ /* External review: only for workflows that require one (or that already hold a response). */
+ function rpExternal(r){
+  const co=(rRoute(store.published,r.form).c)||{},rec=r.mvpExternal;
+  if(!((co.external&&co.external.enabled)||rec))return null;
+  if(!rec||!rec.at)return {sum:'Awaiting response',body:'<p class="rp-muted">No response has been recorded yet.</p>'};
+  return {sum:'Response recorded',body:`<dl class="rp-dl"><dt>Responded by</dt><dd>${esc(rec.by||'Not recorded')}${rec.org?`<small>${esc(rec.org)}</small>`:''}</dd><dt>Received</dt><dd>${esc(rFmt(rec.at))}</dd><dt>Response</dt><dd>${esc(rec.text||'—')}</dd></dl>`};
+ }
+ function rpNotes(r,rev){
+  const notes=(r.mvpNotes||[]).slice().sort((a,b)=>new Date(b.at)-new Date(a.at));
+  const action=rev?'<button type="button" class="inc-textbtn" data-inc-note-add>+ Add note</button>':'';
+  const form=rev?`<div class="inc-note-form" hidden><label class="v32-label" for="inc-note-text">New note</label><textarea id="inc-note-text" maxlength="1500" placeholder="Write what you learned, for example from a phone call or a conversation"></textarea><p class="v32-error" id="inc-note-error" role="alert" hidden></p><div class="inc-note-btns"><button type="button" class="btn" data-inc-note-cancel>Cancel</button><button type="button" class="btn primary" data-inc-note-save="${esc(r.id)}">Save note</button></div></div>`:'';
+  const list=notes.map(n=>`<article class="rp-note-item"><p>${esc(n.text)}</p><small>${esc(n.by||'Reviewer')} · ${esc(rFmt(n.at))}</small></article>`).join('');
+  return {sum:'',count:notes.length,action,body:`<div id="inc-acc-notes">${form}${list||'<p class="rp-muted">No notes yet.</p>'}</div>`};
+ }
+ function rpHistory(r){
+  const items=(r.timeline||[]).slice().reverse();
+  return {sum:'',count:items.length,body:items.length?`<ol class="rp-hist">${items.map(t=>`<li><span class="rp-hdot" aria-hidden="true"></span><p>${esc(t.text)}</p><small>${esc(rFmt(t.at))}</small></li>`).join('')}</ol>`:'<p class="rp-muted">No activity.</p>'};
+ }
+ function rpSections(r,rev){
+  const rv=rpReviews(r,rev),fa=rpActions(r,rev),ex=rpExternal(r),nt=rpNotes(r,rev),hs=rpHistory(r);
+  const sec=[['report','Submitted report',(rev?`Submitted by ${r.reporterName||'—'} · ${rFmt(r.submittedAt)}`:'Submitted '+rFmt(r.submittedAt))+(r.mvpEdits&&r.mvpEdits.length?' · Edited':''),window.rpSubmitted(r),{}],['reviews','Reviews',rv.sum,rv.body,{count:rv.count}],['actions','Follow-up actions',fa.sum,fa.body,{count:fa.count,action:fa.action}]];
+  if(ex)sec.push(['external','External review',ex.sum,ex.body,{}]);
+  sec.push(['notes','Notes',nt.sum,nt.body,{count:nt.count,action:nt.action}],['history','History',hs.sum,hs.body,{count:hs.count}]);
+  return sec;
+ }
+ const rpPanelHtml=(key,r,rev)=>`<div class="rp-panel" data-id="${esc(key)}">${rpBanner(r)}${rpSections(r,rev).map(([k,t,sm,b,o])=>rpAcc(key,k,t,sm,b,o)).join('')}</div>`;
+ window.incReporterPanel=function(r){try{return rpPanelHtml(r.id,r,false)}catch(e){console.error(e);return ''}};
+ /* The reviewer sees the same panel. Follow-up actions and Notes start open, and Reviews opens once the report is accepted. */
+
+ /* ---- review panel header actions ---- */
+ window.rvCompact=function(wide){
+  const dlg=document.querySelector('#modal-root .dialog');if(!dlg)return;dlg.classList.add('dialog-compact');if(wide)dlg.classList.add('dialog-edit');
+  const hd=dlg.querySelector('.dialoghead');if(hd){hd.querySelector('.eyebrow')?.remove();hd.querySelectorAll('p').forEach(p=>{if(!p.textContent.trim())p.remove()})}
+ };
+ let rvFor=null;
+ function rvErr(msg){const e=document.getElementById('rv-error');if(e){e.textContent=msg;e.hidden=false}}
+ function openReassign(r){
+  if(!r)return;rvFor=r.id;const v=r.mvpReview||{},names=EMPLOYEES.map(e=>e.name).filter(n=>n!==v.owner);
+  showModal('rv-reassign','Reassign owner','',`<div class="rv-body"><p class="rv-line">Current owner <strong>${esc(v.owner||'None')}</strong></p><label class="v32-label" for="rv-owner">New owner</label><select id="rv-owner" class="v32-input">${names.map(n=>`<option>${esc(n)}</option>`).join('')}</select><p class="v32-error" id="rv-error" role="alert" hidden></p></div>`,`<span class="push"></span><button type="button" class="btn" data-rv-modal="cancel">Cancel</button><button type="button" class="btn primary" data-rv-modal="reassign">Reassign</button>`,{center:true});
+  window.rvCompact();
+ }
+ function confirmReassign(){
+  const r=find(rvFor);if(!r)return;const v=r.mvpReview||(r.mvpReview={}),to=document.getElementById('rv-owner')?.value;if(!to)return rvErr('Choose the new owner.');
+  const route=vr12Step(r);if(route.second&&v.firstCompleted&&(v.reviews||[])[0]&&v.reviews[0].name===to)return rvErr('A different person must complete the second review.');
+  const from=v.owner;v.owner=to;rvFor=null;closeModal(true);done(r,`Review reassigned from ${from} to ${to} by ${ACTOR}.`);toast(`Owner changed to ${to}.`);
+ }
+ function openEdit(r){
+  if(!r)return;rvFor=r.id;const f=r.form,when=f.eventDate?`${f.eventDate}T${f.eventTime||'00:00'}`:'';
+  const typeOpts=`<option value="">Not assigned</option>`+rGroups().map(t=>`<optgroup label="${esc(t.name)}">${t.items.map(i=>`<option value="${esc(t.id+'|'+i.id)}"${f.type===t.id&&f.subtype===i.id?' selected':''}>${esc(i.name)}</option>`).join('')}</optgroup>`).join('');
+  const sevOpts=[['','Not sure'],...levels().map(l=>[l.id,l.name])].map(([v,n])=>`<option value="${esc(v)}"${(f.severity||'')===v?' selected':''}>${esc(n)}</option>`).join('');
+  const urgOpts=[['yes','Urgent'],['no','Not urgent'],['unknown','Not sure']].map(([v,n])=>`<option value="${v}"${(f.urgency||'unknown')===v?' selected':''}>${n}</option>`).join('');
+  const area=(id,label,val,rows)=>`<div class="rv-f"><label class="v32-label" for="${id}">${label}</label><textarea id="${id}" class="v32-input" rows="${rows}" maxlength="6000">${esc(val||'')}</textarea></div>`;
+  showModal('rv-edit','Edit report','',`<div class="rv-body rv-edit" id="rv-edit-form"><div class="rv-f"><label class="v32-label" for="rv-ed-type">Incident type</label><select id="rv-ed-type" class="v32-input">${typeOpts}</select></div><div class="rv-row3"><div class="rv-f"><label class="v32-label" for="rv-ed-sev">Severity</label><select id="rv-ed-sev" class="v32-input">${sevOpts}</select></div><div class="rv-f"><label class="v32-label" for="rv-ed-urg">Urgency</label><select id="rv-ed-urg" class="v32-input">${urgOpts}</select></div><div class="rv-f"><label class="v32-label" for="rv-ed-when">Date and time</label><input id="rv-ed-when" class="v32-input" type="datetime-local" value="${esc(when)}"></div></div>${area('rv-ed-desc','Description',f.description,4)}<div class="rv-row2">${area('rv-ed-injury','Injury details',f.injuryDetails,3)}${area('rv-ed-resp','Response details',f.responseDetails,3)}</div><div class="rv-f" id="rv-reason-wrap" hidden><label class="v32-label" for="rv-ed-reason">Reason for the change <span aria-hidden="true">*</span></label><textarea id="rv-ed-reason" class="v32-input" rows="2" maxlength="600" placeholder="Why are the type, severity or urgency changing?"></textarea></div><p class="v32-error" id="rv-error" role="alert" hidden></p></div>`,`<span class="push"></span><button type="button" class="btn" data-rv-modal="cancel">Cancel</button><button type="button" class="btn primary" data-rv-modal="save-edit">Save</button>`,{center:true});
+  window.rvCompact(true);
+ }
+ document.addEventListener('change',e=>{
+  if(!['rv-ed-type','rv-ed-sev','rv-ed-urg'].includes(e.target.id))return;
+  const r=find(rvFor);if(!r)return;const f=r.form;
+  const changed=document.getElementById('rv-ed-type').value!==(f.type?f.type+'|'+f.subtype:'')||document.getElementById('rv-ed-sev').value!==(f.severity||'')||document.getElementById('rv-ed-urg').value!==(f.urgency||'unknown');
+  const w=document.getElementById('rv-reason-wrap');if(w)w.hidden=!changed;
+ });
+ document.addEventListener('input',e=>{if(e.target.closest&&e.target.closest('.rv-body')){const er=document.getElementById('rv-error');if(er)er.hidden=true}});
+ function saveEdit(){
+  const r=find(rvFor);if(!r)return;const f=r.form,val=id=>document.getElementById(id)?.value??'';
+  const [type,subtype]=val('rv-ed-type').split('|'),sev=val('rv-ed-sev'),urg=val('rv-ed-urg'),when=val('rv-ed-when'),desc=val('rv-ed-desc').trim(),inj=val('rv-ed-injury').trim(),resp=val('rv-ed-resp').trim(),reason=val('rv-ed-reason').trim();
+  if(!desc)return rvErr('Description is required.');
+  const nm=(t,i)=>{const T=typeBy(t),S=T&&T.subs.find(x=>x.id===i);return S?S.name:'Not assigned'},lv=id=>{const l=levels().find(x=>x.id===id);return l?l.name:'Not sure'},ul={yes:'Urgent',no:'Not urgent',unknown:'Not sure'};
+  const [d,t]=when?when.split('T'):['',''];
+  const ch=[];
+  if((type||'')!==(f.type||'')||(subtype||'')!==(f.subtype||''))ch.push(`Incident type ${nm(f.type,f.subtype)} → ${nm(type,subtype)}`);
+  if(sev!==(f.severity||''))ch.push(`Severity ${lv(f.severity)} → ${lv(sev)}`);
+  if(urg!==(f.urgency||'unknown'))ch.push(`Urgency ${ul[f.urgency||'unknown']} → ${ul[urg]}`);
+  if((d||'')!==(f.eventDate||'')||(t||'')!==(f.eventTime||''))ch.push(`Date and time ${window.rpWhen(f)} → ${d?window.rpWhen({eventDate:d,eventTime:t}):'Not provided'}`);
+  if(desc!==String(f.description||'').trim())ch.push('Description updated');
+  if(inj!==String(f.injuryDetails||'').trim())ch.push('Injury details updated');
+  if(resp!==String(f.responseDetails||'').trim())ch.push('Response details updated');
+  if(!ch.length){closeModal(true);rvFor=null;toast('No changes to save.');return}
+  const sensitive=ch.some(x=>/^(Incident type|Severity|Urgency)/.test(x));
+  if(sensitive&&!reason)return rvErr('Add a reason for the change.');
+  if(!r.original)r.original=clone(f);
+  Object.assign(f,{type:type||'',subtype:subtype||'',severity:sev,urgency:urg,eventDate:d||'',eventTime:t||'',description:desc,injuryDetails:inj,responseDetails:resp});
+  (r.mvpEdits=r.mvpEdits||[]).push({at:rIso(rNow()),by:ACTOR,changes:ch,reason});
+  rvFor=null;closeModal(true);done(r,`Report edited by ${ACTOR}: ${ch.join('; ')}.${reason?' Reason: '+reason:''}`);toast('Report updated. The reporter’s original is kept in the history.');
+ }
+ document.addEventListener('click',e=>{
+  const ra=e.target.closest('[data-rv-reassign]'),ed=e.target.closest('[data-rv-edit]'),m=e.target.closest('[data-rv-modal]');
+  if(ra){e.preventDefault();e.stopImmediatePropagation();if(!ra.disabled)openReassign(find(ra.dataset.rvReassign));return}
+  if(ed){e.preventDefault();e.stopImmediatePropagation();if(!ed.disabled)openEdit(find(ed.dataset.rvEdit));return}
+  if(m){e.preventDefault();e.stopImmediatePropagation();const a=m.dataset.rvModal;if(a==='cancel'){rvFor=null;closeModal(true)}else if(a==='reassign')confirmReassign();else if(a==='save-edit')saveEdit();return}
+ },true);
+ window.incReviewerPanel=function(r){
+  try{
+   const key='rev:'+r.id,st=rpAccOpen[key]||(rpAccOpen[key]={actions:true,notes:true});
+   const v=r.mvpReview||{},accepted=Boolean(v.owner)||['In Review','Follow up pending','Follow up completed','Closed'].includes(status(r));
+   if(accepted&&!st._seen){st.reviews=true;st._seen=true}else if(!accepted)st._seen=false;
+   return rpPanelHtml(key,r,true);
+  }catch(e){console.error(e);return ''}
+ };
+ /* Header buttons open their section first, then the existing handlers do the rest. */
+ window.addEventListener('click',e=>{
+  const k=e.target.closest('[data-inc-note-add]')?'notes':e.target.closest('[data-inc-add]')?'actions':'';if(!k)return;
+  const root=e.target.closest('.rp-panel');if(!root)return;
+  const btn=root.querySelector(`[data-rp-acc="${k}"]`),body=document.getElementById('rp-'+k);
+  if(btn&&btn.getAttribute('aria-expanded')!=='true'){btn.setAttribute('aria-expanded','true');if(body)body.hidden=false;(rpAccOpen[root.dataset.id]=rpAccOpen[root.dataset.id]||{})[k]=true}
+ },true);
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-rp-acc]');if(!b)return;
+  e.preventDefault();const root=b.closest('.rp-panel'),id=root&&root.dataset.id,k=b.dataset.rpAcc,open=b.getAttribute('aria-expanded')!=='true';
+  b.setAttribute('aria-expanded',String(open));const body=document.getElementById('rp-'+k);if(body)body.hidden=!open;
+  (rpAccOpen[id]=rpAccOpen[id]||{})[k]=open;
+ });
+ /* Sample data: one complete closed case so every section of the panel can be reviewed. */
+ (function(){
+  const r=rState.reports.find(x=>x.id==='INC-1046');if(!r||r.mvpReview||r.mvpExternal)return;
+  const t=h=>rIso(new Date(r.submittedAt).getTime()+h*3600000);
+  r.acceptedAt=t(1);r.reviewCompletedAt=t(5);
+  r.mvpReview={owner:'Jordan Lee',claimedAt:t(1),outcome:'approved',decision:'approved',signedBy:'Jordan Lee',signedAt:t(5),decidedAt:t(5),firstCompleted:true,followup:null,closed:true,reviews:[{n:1,name:'Jordan Lee',at:t(5),outcome:'approved',signatureImg:'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'}]};
+  r.mvpExternal={by:'Dr. A. Rahman',org:'Outside clinical specialist',at:t(20),text:'Reviewed the case. No further action is needed from the facility.'};
+  r.mvpNotes=[{id:'n-1046',text:'Spoke with the unit lead. No new concerns were raised.',by:'Jordan Lee',at:t(22)}];
+  r.timeline=[{at:r.submittedAt,text:'Report submitted by Jordan Lee.'},{at:t(1),text:'Review claimed by Jordan Lee.'},{at:t(5),text:'Approved by Jordan Lee.'},{at:t(25),text:'Status changed to Closed by Jordan Lee.'}];
+ })();
  window.incPanel=function(r,role){try{if(accFor!==r.id){accFor=r.id;acc={actions:true,notes:true,history:false}}return reviewsSection(r)+actionsSection(r,role)+notesSection(r,role)+historySection(r)}catch(e){console.error(e);return ''}};
 
  /* ---- actions ---- */
@@ -4951,7 +5616,7 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
   const c=e.target.closest('[data-inc-complete],[data-inc-undo],[data-inc-add]');if(!c||c.disabled)return;
   e.preventDefault();e.stopImmediatePropagation();
   if(c.dataset.incAdd){openAdd(find(c.dataset.incAdd));return}
-  const id=c.dataset.incComplete||c.dataset.incUndo,r=find(id);if(!r||status(r)!=='Follow up pending')return;
+  const id=c.dataset.incComplete||c.dataset.incUndo,r=find(id);if(!r||!actionable(r))return;
   const a=(r.mvpActions||[]).find(x=>x.id===c.dataset.act);if(!a)return;
   if(c.dataset.incComplete){a.completedAt=rIso(rNow());a.completedBy=ACTOR;done(r,`Follow-up action completed by ${ACTOR}: ${a.title}`);toast('Action marked complete.')}
   else{a.completedAt=null;a.completedBy=null;done(r,`Follow-up action reopened by ${ACTOR}: ${a.title}`);toast('Action reopened.')}
@@ -5109,19 +5774,26 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
  const any=(f,list)=>Object.values(LISTS[list]).some(k=>f[k].length);
  const count=(f,list)=>Object.values(LISTS[list]).reduce((n,k)=>n+f[k].length,0);
  const noneKey=list=>list==='affected'?'affectedNone':'involvedNone';
+ const unkKey=list=>list==='affected'?'affectedUnknown':'involvedUnknown';
+ const onKey=list=>list==='affected'?'affectedOn':'involvedOn';
  const stashKey=list=>list==='affected'?'affectedStash':'involvedStash';
  const label0=list=>list==='affected'?'No person affected':'No person involved';
- const syncAffected=f=>{f.affected=f.affectedNone?['none']:[f.patients.length?'patient':'',f.employees.length?'employee':'',f.others.length?'other':''].filter(Boolean)};
+ const syncAffected=f=>{const on=f.affectedOn||{};f.affected=f.affectedNone?['none']:f.affectedUnknown?['unknown']:[(f.patients.length||on.patient)?'patient':'',(f.employees.length||on.employee)?'employee':'',(f.others.length||on.other)?'other':''].filter(Boolean)};
  const ensure=f=>{
   ['involvedPatients','involvedEmployees','involvedOthers'].forEach(k=>{if(!Array.isArray(f[k]))f[k]=[]});
   if(!Array.isArray(f.caused))f.caused=[];
   if(f.affectedNone===undefined)f.affectedNone=(f.affected||[]).includes('none');
   if(f.involvedNone===undefined)f.involvedNone=false;
+  if(f.affectedUnknown===undefined)f.affectedUnknown=(f.affected||[]).includes('unknown');
+  if(f.involvedUnknown===undefined)f.involvedUnknown=false;
+  if(!f.affectedOn)f.affectedOn={patient:f.patients.length>0||(f.affected||[]).includes('patient'),employee:f.employees.length>0||(f.affected||[]).includes('employee'),other:f.others.length>0||(f.affected||[]).includes('other')};
+  if(!f.involvedOn)f.involvedOn={patient:f.involvedPatients.length>0,employee:f.involvedEmployees.length>0,other:f.involvedOthers.length>0};
+  if(!f.pplStash)f.pplStash={affected:{},involved:{}};
   syncAffected(f);
   if(!f.urgency)f.urgency='unknown';
  };
  const err=k=>rUI.fieldErrors&&rUI.fieldErrors[k]?`<p class="inc-ferr" role="alert" id="inc-err-${k}">${esc(rUI.fieldErrors[k])}</p>`:'';
- const ff=(key,label,body,o={})=>`<div class="inc-ff${o.span?' inc-span2':''}" data-ff="${key}"><label${o.forId?` for="${o.forId}"`:''}>${label}${o.required?star:''}</label>${o.help?`<p class="inc-help">${o.help}</p>`:(o.span||o.nohelp?'':'<p class="inc-help" aria-hidden="true"></p>')}${body}${err(key)}</div>`;
+ const ff=(key,label,body,o={})=>`<div class="inc-ff${o.span?' inc-span2':''}" data-ff="${key}"><label id="inc-lbl-${key}"${o.forId?` for="${o.forId}"`:''}>${label}${o.required?star:''}</label>${body}${err(key)}</div>`;
 
  const chip=(list,kind,v)=>`<span class="r-chip" title="${esc(nameOf(kind,v))}"><span class="inc-chip-text">${esc(nameOf(kind,v))}</span><button type="button" data-ppl-remove="${list}" data-kind="${kind}" data-id="${esc(v)}" aria-label="Remove ${esc(nameOf(kind,v))}">${icon('close',11)}</button></span>`;
  /* patients and employees: tags and the search live in one field */
@@ -5130,15 +5802,31 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
  /* others: the same field. Type a name and press Enter; it becomes a tag. */
  const otherCell=(list,f,off)=>{const arr=f[LISTS[list].other];
   return `<div class="r-searchwrap"><div class="r-person-combobox${off?' is-disabled':''}" data-fit>${arr.map(v=>chip(list,'other',v)).join('')}<input type="text" id="inc-oth-${list}" maxlength="120" data-ppl-other="${list}" placeholder="${arr.length?'Add more':'Type a name, press Enter'}" aria-label="Other person: type a name and press Enter"${off?' disabled':''}></div></div>`};
+ const KIND_LABEL={patient:'Patients',employee:'Employees',other:'Others'};
  const peopleBody=(list,f)=>{
-  const off=Boolean(f[noneKey(list)]);
-  return `<label class="r-check inc-none"><input type="checkbox" data-ppl-none="${list}"${off?' checked':''}>${label0(list)}</label><div class="inc-triple">${ff(list+'-p','Patients',searchCell(list,'patient',f,off),{nohelp:true})}${ff(list+'-e','Employees',searchCell(list,'employee',f,off),{nohelp:true})}${ff(list+'-o','Others',otherCell(list,f,off),{nohelp:true})}</div>`;
+  const on=f[onKey(list)],none=Boolean(f[noneKey(list)]),unk=Boolean(f[unkKey(list)]);
+  const opt=(attr,type,name,checked,label)=>`<label class="inc-opt"><input type="${type}"${name?` name="${name}"`:''} ${attr}${checked?' checked':''}>${label}</label>`;
+  const cell=kind=>on[kind]?ff(list+'-'+kind[0],KIND_LABEL[kind],kind==='other'?otherCell(list,f,false):searchCell(list,kind,f,false),{}):'';
+  return `<div class="inc-pp-opts" role="group" aria-label="${list==='affected'?'Affected':'Involved'} people">${['patient','employee','other'].map(k=>opt(`data-ppl-kind="${list}:${k}"`,'checkbox','',Boolean(on[k]),KIND_LABEL[k])).join('')}<span class="inc-pp-sep" aria-hidden="true"></span>${opt(`data-ppl-excl="${list}:unknown" value="unknown"`,'radio',`inc-${list}-excl`,unk,'Unknown person')}${opt(`data-ppl-excl="${list}:none" value="none"`,'radio',`inc-${list}-excl`,none,label0(list))}</div>${(!none&&!unk&&(on.patient||on.employee||on.other))?`<div class="inc-pp-cells">${['patient','employee','other'].map(cell).join('')}</div>`:''}`;
  };
- const peopleMeta=(list,f)=>f[noneKey(list)]?label0(list):(count(f,list)?`${count(f,list)} added`:'None added');
+ const peopleMeta=(list,f)=>f[noneKey(list)]?label0(list):f[unkKey(list)]?'Unknown person':(count(f,list)?`${count(f,list)} added`:'None added');
 
  const sec=(key,title,meta,body,o={})=>{const S=rUI.formSecs,open=Boolean(S[key]);
   return `<section class="inc-fsec" data-sec="${key}"><button type="button" class="inc-fsec-head" data-inc-sec="${key}" aria-expanded="${open}" aria-controls="inc-sec-${key}">${chev}<h3>${title}</h3><span class="inc-fsec-meta${o.warn?' warn':''}">${meta}</span></button><div class="inc-fsec-body" id="inc-sec-${key}"${open?'':' hidden'}>${body}</div></section>`};
 
+ /* Dropdown with a colour dot inside the field and beside each option. */
+ const csel=(key,opts,value)=>{
+  const cur=opts.find(o=>o.v===value)||opts[0];
+  return `<div class="csel" data-csel="${key}"><button type="button" class="csel-btn" id="inc-${key}" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="inc-lbl-${key} inc-${key}-val"><span class="csel-dot" style="background:${esc(cur.color)}" aria-hidden="true"></span><span class="csel-val" id="inc-${key}-val">${esc(cur.label)}</span>${chev}</button><ul class="csel-list" role="listbox" tabindex="-1" aria-labelledby="inc-lbl-${key}" hidden>${opts.map(o=>`<li role="option" id="inc-${key}-o-${o.v||'none'}" data-v="${esc(o.v)}" aria-selected="${o.v===cur.v}"><span class="csel-dot" style="background:${esc(o.color)}" aria-hidden="true"></span><span>${esc(o.label)}</span></li>`).join('')}</ul></div>`;
+ };
+ /* The action bar sits under the scrolling form, inside the panel, so it never scrolls away. */
+ const rpDrawerWithBar=rpDrawerContents;
+ rpDrawerContents=function(){
+  const html=rpDrawerWithBar(),m=html.match(/<footer class="r-formfooter">[\s\S]*?<\/footer>/);
+  if(!m)return html;
+  const bar=m[0].replace('class="r-formfooter"','class="r-formfooter rp-bar"');
+  return html.replace(m[0],'').replace(/<\/div><\/div><\/section>\s*$/,`</div></div>${bar}</section>`);
+ };
  rFormView=function(){
   const f=rUI.form;ensure(f);
   if(rUI.formSecsFor!==f){rUI.formSecs={details:true,affected:true,involved:false,other:false};rUI.formSecsFor=f}
@@ -5150,14 +5838,16 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
   const done=f.subtype&&String(f.description||'').trim();
   const detailsMeta=hasErr?'Needs attention':(done?'Complete':'Required');
   const files=(f.attachments||[]).length,otherN=[f.injuryDetails,f.responseDetails].filter(x=>String(x||'').trim()).length+(files?1:0);
-  const details=`<div class="inc-grid">
-${ff('type','Incident type',`<div class="r-classwrap"><button type="button" class="r-classbutton" data-r="toggle-classification" aria-expanded="false" aria-controls="r-classmenu" title="${f.subtype?esc(rClass(f)):''}"><span>${typeLabel}</span>${icon('down',15)}</button><div class="r-classmenu" id="r-classmenu" hidden><input type="search" id="r-class-search" aria-label="Search incident types" placeholder="Search types"><div class="r-classlist" id="r-classlist">${rClassMenu()}</div></div></div>`,{required:true,help:'Choose the closest match.'})}
-${ff('severity','Severity',`<div class="r-severityrow"><span class="r-severitydot" style="background:${esc(store.published.colors[f.severity]||'#B4BCC3')}"></span><select data-rf="severity" name="severity" id="inc-severity" aria-label="Severity"><option value="">Not sure</option>${sevItems.map(l=>`<option value="${l.id}"${f.severity===l.id?' selected':''}>${esc(l.name)}</option>`).join('')}</select></div>`,{help:'Your best estimate.'})}
-${ff('urgency','Urgent attention needed?',rRadio('urgency',[['yes','Yes'],['no','No'],['unknown','Not sure']],false),{help:'Choose Yes if someone needs help now.'})}
-${ff('event','Date and time',`<input id="inc-when" type="datetime-local" value="${esc(when)}" max="${nowLocal}" aria-label="Date and time">`,{help:'Leave blank if you don’t know.'})}
-${f.urgency==='yes'?`<div class="note amber inc-span2">${icon('warning',16)}<div>Follow your facility’s emergency procedure now. Submitting this report doesn’t call for help.</div></div>`:''}
-${ff('description','Description',rArea('description','','maxlength="6000" rows="5" aria-required="true" id="inc-description"'),{required:true,span:true,help:'Facts only: what led up to it, what happened and what followed.'})}
-</div>`;
+  const sevOpts=[{v:'',label:'Not sure',color:'#a8b4bf'},...sevItems.map(l=>({v:l.id,label:l.name,color:store.published.colors[l.id]||'#607D70'}))];
+  const urgOpts=[{v:'yes',label:'Urgent',color:'#c5424a'},{v:'no',label:'Not urgent',color:'#7a97b3'},{v:'unknown',label:'Not sure',color:'#c3cdd6'}];
+  const details=`<div class="inc-row4">
+${ff('type','Incident type',`<div class="r-classwrap"><button type="button" class="r-classbutton" data-r="toggle-classification" aria-expanded="false" aria-controls="r-classmenu" title="${f.subtype?esc(rClass(f)):''}"><span>${typeLabel}</span>${icon('down',15)}</button><div class="r-classmenu" id="r-classmenu" hidden><input type="search" id="r-class-search" aria-label="Search incident types" placeholder="Search types"><div class="r-classlist" id="r-classlist">${rClassMenu()}</div></div></div>`,{required:true})}
+${ff('severity','Severity',csel('severity',sevOpts,f.severity),{forId:'inc-severity'})}
+${ff('urgency','Urgency',csel('urgency',urgOpts,f.urgency),{forId:'inc-urgency'})}
+${ff('event','Date and time',`<input id="inc-when" type="datetime-local" value="${esc(when)}" max="${nowLocal}" aria-label="Date and time">`,{forId:'inc-when'})}
+</div>
+${f.urgency==='yes'?`<div class="note amber inc-urgnote">${icon('warning',16)}<div>Follow your facility’s emergency procedure now. Submitting this report doesn’t call for help.</div></div>`:''}
+<div class="inc-desc">${ff('description','Description',rArea('description','','maxlength="6000" rows="5" aria-required="true" id="inc-description"'),{required:true,span:true})}</div>`;
   const other=`<div class="inc-grid">
 ${ff('injuryDetails','Injury details',rArea('injuryDetails','','maxlength="2500" rows="4" id="inc-injury"'),{help:'Describe any injury. Leave blank if none.'})}
 ${ff('responseDetails','Response details',rArea('responseDetails','','maxlength="3500" rows="4" id="inc-response"'),{help:'Describe what was done, such as first aid or calling for help. Leave blank if none.'})}
@@ -5213,7 +5903,7 @@ ${sec('other','Other details',otherN?`${otherN} filled`:'None added',other)}
    return;
   }
   rUI.fieldErrors={};syncAffected(f);
-  if(!f.affectedNone&&!any(f,'affected')&&!f.noAffectedConfirmed){if(!confirm('No affected person added. Submit anyway? To record that nobody was affected, cancel and tick “No person affected”.'))return;f.noAffectedConfirmed=true}
+  if(!f.affectedNone&&!f.affectedUnknown&&!any(f,'affected')&&!f.noAffectedConfirmed){if(!confirm('No affected person added. Submit anyway? To record that nobody was affected, cancel and choose “No person affected”.'))return;f.noAffectedConfirmed=true}
   f.affectedStash=null;f.involvedStash=null;
   const other=rValidation(f);if(other.length){toast(other[0],true);return}
   rSubmit();
@@ -5224,16 +5914,26 @@ ${sec('other','Other details',otherN?`${otherN} filled`:'None added',other)}
  const refreshMeta=()=>{const m=document.querySelector('[data-sec=details] .inc-fsec-meta');if(!m)return;const f=rUI.form,ta=document.getElementById('inc-description'),desc=ta?ta.value:f.description,errs=rUI.fieldErrors||{},bad=errs.type||errs.description,done=f.subtype&&String(desc||'').trim();m.textContent=bad?'Needs attention':(done?'Complete':'Required');m.classList.toggle('warn',Boolean(bad))};
  document.addEventListener('input',()=>setTimeout(refreshMeta,0),true);document.addEventListener('change',()=>setTimeout(refreshMeta,0),true);
 
- /* "No person affected / involved": switches the three fields off and keeps the list aside */
+ /* Tick Patients, Employees or Others to show its search field. Unknown person and No person switch every field off.
+    People already added are kept aside and come back if the choice is undone. */
  document.addEventListener('change',e=>{
-  const el=e.target;if(!el.dataset||!el.dataset.pplNone)return;e.stopImmediatePropagation();
-  const list=el.dataset.pplNone,f=rUI.form;ensure(f);const k=LISTS[list],sk=stashKey(list);
-  if(el.checked){
-   if(any(f,list))f[sk]={patients:f[k.patient],employees:f[k.employee],others:f[k.other]};
-   f[k.patient]=[];f[k.employee]=[];f[k.other]=[];f[noneKey(list)]=true;
+  const el=e.target;if(!el.dataset||(!el.dataset.pplKind&&!el.dataset.pplExcl))return;e.stopImmediatePropagation();
+  const f=rUI.form;ensure(f);
+  const toList=a=>({patients:f[LISTS[a].patient],employees:f[LISTS[a].employee],others:f[LISTS[a].other]});
+  if(el.dataset.pplKind){
+   const [list,kind]=el.dataset.pplKind.split(':'),K=LISTS[list],key=K[kind],on=f[onKey(list)],sk=stashKey(list),st=f.pplStash[list];
+   if(f[noneKey(list)]||f[unkKey(list)]){
+    f[noneKey(list)]=false;f[unkKey(list)]=false;
+    if(f[sk]){const b=f[sk];if(b.patients.length){f[K.patient]=b.patients;on.patient=true}if(b.employees.length){f[K.employee]=b.employees;on.employee=true}if(b.others.length){f[K.other]=b.others;on.other=true}f[sk]=null}
+   }
+   if(el.checked){on[kind]=true;if(st[kind]&&st[kind].length&&!f[key].length)f[key]=st[kind];st[kind]=null}
+   else{if(f[key].length)st[kind]=f[key];f[key]=[];on[kind]=false;if(list==='affected')f.injured=(f.injured||[]).filter(x=>!x.startsWith(kind+':'))}
   }else{
-   f[noneKey(list)]=false;
-   if(f[sk]){f[k.patient]=f[sk].patients;f[k.employee]=f[sk].employees;f[k.other]=f[sk].others;f[sk]=null}
+   const [list,which]=el.dataset.pplExcl.split(':'),K=LISTS[list],on=f[onKey(list)],sk=stashKey(list);
+   if(any(f,list)&&!f[sk])f[sk]=toList(list);
+   f[K.patient]=[];f[K.employee]=[];f[K.other]=[];on.patient=false;on.employee=false;on.other=false;
+   f[noneKey(list)]=which==='none';f[unkKey(list)]=which==='unknown';
+   if(list==='affected')f.injured=[];
   }
   syncAffected(f);rUI.formDirty=true;render();
  },true);
@@ -5288,6 +5988,33 @@ ${sec('other','Other details',otherN?`${otherN} filled`:'None added',other)}
   }
   if(e.target.closest('[data-r="select-classification"]')&&rUI.fieldErrors)delete rUI.fieldErrors.type;
   if(!e.target.closest('.r-searchwrap'))document.querySelectorAll('.rp-drawer .r-results').forEach(b=>{b.hidden=true});
+ },true);
+
+ /* Custom dropdown behaviour: click or keyboard, arrows to move, Enter to choose, Escape to close without closing the form. */
+ const cselOpts=w=>[...w.querySelectorAll('[role=option]')];
+ function cselClose(w,focusBtn){const b=w.querySelector('.csel-btn'),l=w.querySelector('.csel-list');l.hidden=true;b.setAttribute('aria-expanded','false');l.removeAttribute('aria-activedescendant');if(focusBtn)b.focus({preventScroll:true})}
+ function cselActive(w,o){cselOpts(w).forEach(x=>x.classList.toggle('is-active',x===o));w.querySelector('.csel-list').setAttribute('aria-activedescendant',o.id);if(o.scrollIntoView)o.scrollIntoView({block:'nearest'})}
+ function cselOpen(w){document.querySelectorAll('.csel').forEach(x=>{if(x!==w)cselClose(x)});const b=w.querySelector('.csel-btn'),l=w.querySelector('.csel-list'),o=cselOpts(w);l.hidden=false;b.setAttribute('aria-expanded','true');cselActive(w,o.find(x=>x.getAttribute('aria-selected')==='true')||o[0]);l.focus({preventScroll:true})}
+ function cselPick(w,o){const key=w.dataset.csel;ensure(rUI.form);rUI.form[key]=o.dataset.v;rUI.formDirty=true;render();document.getElementById('inc-'+key)?.focus({preventScroll:true})}
+ document.addEventListener('click',e=>{
+  const b=e.target.closest('.csel-btn');
+  if(b){e.preventDefault();e.stopImmediatePropagation();const w=b.closest('.csel');b.getAttribute('aria-expanded')==='true'?cselClose(w):cselOpen(w);return}
+  const o=e.target.closest('.csel [role=option]');
+  if(o){e.preventDefault();e.stopImmediatePropagation();cselPick(o.closest('.csel'),o);return}
+  document.querySelectorAll('.csel').forEach(w=>{if(!w.contains(e.target))cselClose(w)});
+ },true);
+ window.addEventListener('keydown',e=>{
+  const w=e.target&&e.target.closest?e.target.closest('.csel'):null;if(!w)return;
+  const l=w.querySelector('.csel-list'),open=!l.hidden,o=cselOpts(w),i=o.findIndex(x=>x.classList.contains('is-active'));
+  if(!open){if(['ArrowDown','ArrowUp','Enter',' '].includes(e.key)&&e.target.classList.contains('csel-btn')){e.preventDefault();e.stopPropagation();cselOpen(w)}return}
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cselClose(w,true);return}
+  if(e.key==='Tab'){cselClose(w);return}
+  if(e.key==='ArrowDown'){e.preventDefault();cselActive(w,o[Math.min(o.length-1,i+1)])}
+  else if(e.key==='ArrowUp'){e.preventDefault();cselActive(w,o[Math.max(0,i-1)])}
+  else if(e.key==='Home'){e.preventDefault();cselActive(w,o[0])}
+  else if(e.key==='End'){e.preventDefault();cselActive(w,o[o.length-1])}
+  else if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();cselPick(w,o[i]||o[0])}
+  else if(e.key.length===1){const ch=e.key.toLowerCase(),n=o.slice(i+1).concat(o.slice(0,i+1)).find(x=>x.textContent.trim().toLowerCase().startsWith(ch));if(n)cselActive(w,n)}
  },true);
 
  /* one picker for date and time */
