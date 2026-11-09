@@ -541,7 +541,7 @@ const icon=(n,s=17)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="
 const PAGES=[['types','catalog','Incident types'],['severity','severity','Severity'],['workflow','flow','Workflow'],['notification','bell','Notifications'],['signature','pen','Signatures'],['sla','clock','SLA targets']];
 const TYPES=CATALOG.map(([name,subs],i)=>({id:`INC-${String(i+1).padStart(2,'0')}`,name,subs:subs.map((name,j)=>({id:`INC-${i+1}-SUB-${j+1}`,name})),list:`LST-SUB-${String(i+1).padStart(2,'0')}`}));
 const SUBNAMES=['Fall and injury subtypes','Medication and substance subtypes','Self-harm and suicide subtypes','Violence and bullying subtypes','Abuse, rights and sexual-safety subtypes','Missing resident and departure subtypes','Restraint and seclusion subtypes','Death and medical-event subtypes','Care, infection and food-safety subtypes','Environment, transport and security subtypes','Privacy and system subtypes'];
-const LISTS=[{id:'LST-INCIDENT',name:'Incident main categories',kind:'types',items:TYPES.map(({id,name})=>({id,name}))},...TYPES.map((t,i)=>({id:t.list,name:SUBNAMES[i],kind:'subtypes',items:t.subs})),{id:'LST-SEVERITY',name:'Incident seriousness levels',kind:'severity',items:[{id:'mild',name:'Mild',rank:1},{id:'moderate',name:'Moderate',rank:2},{id:'severe',name:'Severe',rank:3},{id:'catastrophic',name:'Catastrophic',rank:4}]}];
+const LISTS=[{id:'LST-INCIDENT',name:'Incident types',kind:'types',items:TYPES.map(({id,name})=>({id,name}))},...TYPES.map((t,i)=>({id:t.list,name:SUBNAMES[i],kind:'subtypes',items:t.subs})),{id:'LST-SEVERITY',name:'Severity levels',kind:'severity',items:[{id:'mild',name:'Mild',rank:1},{id:'moderate',name:'Moderate',rank:2},{id:'severe',name:'Severe',rank:3},{id:'catastrophic',name:'Catastrophic',rank:4}]}];
 const GROUPS=[{id:'local:case',name:'Case Management',scope:'Incident location',review:true},{id:'local:clinical',name:'Clinical Review',scope:'Incident location',review:true},{id:'local:duty',name:'On-duty Review Team',scope:'Incident location',review:true},{id:'local:privacy',name:'Privacy Review',scope:'Incident location',review:true},{id:'local:facilities',name:'Facilities Team',scope:'Incident location',review:false},{id:'facility:oversight',name:'Facility Oversight',scope:'Organization-wide',review:true},{id:'facility:safety',name:'Central Safety Backup',scope:'Organization-wide',review:true}];
 const NOTIFICATIONS=[
 {id:'N-REPORTED',name:'Incident submission received',trigger:'incident.reported',purpose:'Acknowledges a saved submission. It does not acknowledge a reviewer task.',channels:['In-app'],subject:'Incident {incident_number} received',body:'Your incident report {incident_number} has been received. You can view your submitted account and permitted updates in the incident workspace.',audience:'Submitting employee, resolved by the incident workflow.'},
@@ -652,7 +652,7 @@ note('<strong>Illustrative internal targets only.</strong> All timings below are
 }
 // Dialogs edit a working copy. Applying a dialog updates the draft, never the demo publication.
 function showModal(kind,title,subtitle,body,footer='',opts={}){ui.lastFocus=document.activeElement;ui.modal={kind,data:opts.data||null,dirty:false};const centered=opts.center!==false;$('#modal-root').innerHTML=`<div class="backdrop ${centered?'center':''}"><section class="dialog ${centered?'center':''} ${opts.wide?'wide':''}" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialoghead"><div><div class="eyebrow">${opts.eyebrow||'Facility configuration'}</div><h2 id="dialog-title">${esc(title)}</h2><p>${esc(subtitle)}</p></div><button class="btn ghost square push" data-act="close-modal" aria-label="Close dialog">${icon('close',19)}</button></header><div class="dialogbody" id="dialog-body"><div id="modal-error" class="formerror" role="alert" hidden></div>${body}</div><footer class="dialogfoot">${footer||`<span class="help">Prototype only · No live services</span>${btn('Close','close-modal')}`}</footer></section></div>`;document.body.style.overflow='hidden';setTimeout(()=>{$('#modal-root input:not([type=checkbox]), #modal-root select, #modal-root button')?.focus()},20);}
-function closeModal(force=false){if(!force&&ui.modal?.dirty&&!confirm('Discard unapplied changes in this editor?'))return;$('#modal-root').innerHTML='';document.body.style.overflow='';ui.modal=null;const focus=ui.lastFocus;if(focus?.isConnected)focus.focus();else $('#save-draft').focus()}
+function closeModal(force=false){if(!force&&ui.modal?.dirty&&incGuard({msg:'Discard unapplied changes in this editor?'},()=>closeModal(true)))return;$('#modal-root').innerHTML='';document.body.style.overflow='';ui.modal=null;const focus=ui.lastFocus;if(focus?.isConnected)focus.focus();else $('#save-draft').focus()}
 function errorModal(msg){const el=$('#modal-error');if(el){el.textContent=msg;el.hidden=false;el.scrollIntoView({block:'nearest'})}else toast(msg,true)}
 function formFooter(){return `${btn('Cancel','close-modal')}${btn('Apply','apply-editor','primary','','check')}`}
 function formSection(title,body,caption=''){return `<section class="formsection"><div class="sectiontitle">${title}${caption?`<span>${caption}</span>`:''}</div>${body}</section>`}
@@ -704,7 +704,7 @@ function openPublish(){const errors=validation(),changedSections=changes();showM
 function publishDemo(){if(validation().length)return errorModal('Resolve the open items before activating.');const f=$('#publish-form');if(!f.reportValidity())return;const d=new FormData(f);const reason=String(d.get('reason')||'').trim();if(reason.length<4||!d.has('understood'))return errorModal('Enter an activation note and confirm the prototype-only scope.');store.version++;store.published=clone(config());store.savedAt=new Date().toISOString();store.history.unshift({version:store.version,at:store.savedAt,reason,snapshot:clone(config())});if(store.history.length>15)store.history.length=15;const saved=persist();ui.unsaved=!saved;closeModal(true);render();showModal('activated','Version '+store.version+' activated',saved?'Saved in this browser only. No live configuration changed.':'Kept in memory only. Export to preserve it; browser storage is unavailable.',`<div class="note green">${icon('check',16)}<div><strong>Version ${store.version} is now the active configuration in this prototype.</strong><br>Reporters see the new lists, review routes and SLA targets for reports they submit from now on.</div></div>`,`<span class="push"></span>${btn('Done','close-modal','primary')}`,{center:true})}
 function openHistory(){showModal('history','Version history','Activated versions are kept in this browser. Restoring creates a draft, not an in-place overwrite.',`<div class="card">${store.history.map(h=>`<div class="engine-row"><div class="enginebody"><h3>Version ${h.version} ${h.version===store.version?statusPill('Current','green'):''}</h3><p>${esc(h.reason)}</p><span class="tiny muted">${fmt(h.at)}</span></div>${btn('Restore as draft','restore-version','small',`data-version="${h.version}"`)}</div>`).join('')}</div>`,null,{center:true})}
 function download(filename,body,type='application/json'){const blob=new Blob([body],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
-function exportDraft(){download('Facility_Incident_Admin_v0_6_Draft.json',JSON.stringify({prototypeVersion:VERSION,exportedAt:new Date().toISOString(),scope:'Fictional browser-only prototype. No clinical or legal approval.',configuration:clone(config()),referencedLibraries:{lists:LISTS,groups:GROUPS,notifications:NOTIFICATIONS,signatures:SIGNATURES}},null,2));toast('Draft exported with its sample reference libraries. No patient data is included.')}
+function exportDraft(){download('Facility_Incident_Admin_v0_6_Draft.json',JSON.stringify({prototypeVersion:VERSION,exportedAt:new Date().toISOString(),scope:'Fictional browser-only prototype. No clinical or legal approval.',configuration:clone(config()),referencedLibraries:{lists:LISTS,groups:GROUPS,notifications:NOTIFICATIONS,signatures:SIGNATURES}},null,2));toast('Draft exported. No patient data is included.')}
 // Workflow simulation: intentionally in-memory and independent of the configuration draft.
 function chooseRoute(input){const matches=[];for(const w of config().workflow.templates.filter(w=>w.enabled&&!w.fallback)){if(!w.types.includes(input.type))continue;for(const c of w.combinations)if(severitySet(c).includes(input.severity)&&urgencySet(c).includes(input.urgency))matches.push({w,c});}if(matches.length>1)return {error:'More than one base review combination matches. Resolve the overlapping conditions before running this example.'};if(matches.length)return matches[0];const w=config().workflow.templates.find(w=>w.enabled&&w.fallback);return w?.combinations[0]?{w,c:w.combinations[0]}:{error:'No eligible review route. Configure the default workflow first.'};}
 function simulationInputs(){const i=ui.sim?.input||{type:'INC-01',severity:'severe',urgency:'no'};return `<div class="siminputs">${field('Incident type','simType',sel('simType',[['','Not assigned'],...types()],i.type))}${field('Severity','simSeverity',sel('simSeverity',[['','Not assessed yet'],...levels()],i.severity))}${field('Urgent attention?','simUrgency',sel('simUrgency',[['no','No'],['yes','Yes'],['unknown','Not sure']],i.urgency))}${btn('Run example','run-sim','primary','','play')}</div><div class="actions" style="margin-top:12px"><span class="tiny muted">Try:</span>${btn('Severe fall','sim-preset','small','data-preset="severe"')}${btn('Unassessed + urgent','sim-preset','small','data-preset="urgent"')}${btn('Mild concern','sim-preset','small','data-preset="mild"')}</div><div id="sim-result">${ui.sim?renderSimulation():`<div class="empty" style="padding:32px 15px">Run a fictional incident to test matching, review order, signatures, and changes requested.</div>`}</div>`}
@@ -733,8 +733,8 @@ document.addEventListener('click',event=>{const pageButton=event.target.closest(
  if(a==='close-modal'){closeModal();return}
  if(a==='save'){saveDraft();return}if(a==='export'){exportDraft();return}if(a==='review-publish'){openPublish();return}if(a==='publish'){publishDemo();return}if(a==='history'){closeModal(true);openHistory();return}
  if(a==='jump-page'){const page=el.dataset.page;closeModal(true);ui.page=page;ui.workflowId=null;render();return}
- if(a==='restore-version'){const h=store.history.find(h=>h.version===Number(el.dataset.version));if(h&&confirm(`Replace the working draft with version ${h.version}? The active version will not change.`)){store.draft=clone(h.snapshot);ui.workflowId=null;changed();closeModal(true);render();toast(`Version ${h.version} restored as a draft.`)}return}
- if(a==='about'){about();return}if(a==='reset'){if(confirm('Reset this v0.5 demo and its local history? Export first to preserve your draft.')){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}return}
+ if(a==='restore-version'){const h=store.history.find(h=>h.version===Number(el.dataset.version));if(h){incAsk({msg:`Replace the working draft with version ${h.version}? The active version will not change.`}).then(ok=>{if(ok){store.draft=clone(h.snapshot);ui.workflowId=null;changed();closeModal(true);render();toast(`Version ${h.version} restored as a draft.`)}})}return}
+ if(a==='about'){about();return}if(a==='reset'){if(true){incAsk({msg:'Reset this v0.5 demo and its local history? Export first to preserve your draft.'}).then(ok=>{if(ok){try{localStorage.removeItem(KEY)}catch(e){}location.reload()}})}return}
  if(a==='list-preview'){openList(el.dataset.id);return}if(a==='report-preview'){openReportPreview();return}
  if(a==='toggle-subtypes'){const m=config().typeLinks.find(m=>m.typeId===el.dataset.id);m.useSubtypes=!m.useSubtypes;changed();render();return}
  if(a==='edit-workflow'){ui.page='workflow';ui.workflowId=el.dataset.id;ui.comboId=null;render();window.scrollTo(0,0);return}
@@ -744,12 +744,12 @@ document.addEventListener('click',event=>{const pageButton=event.target.closest(
  if(a==='toggle-type-menu'){const wrap=el.closest('.multi'),menu=wrap.querySelector('.multimenu');menu.hidden=!menu.hidden;el.setAttribute('aria-expanded',String(!menu.hidden));return}
  if(a==='select-combination'){ui.comboId=el.dataset.id;render();return}
  if(a==='conditions'){openConditions();return}if(a==='add-combination'){openConditions(true);return}
- if(a==='remove-combination'){const {w,c}=getEditing();if(!w.fallback&&w.combinations.length>1&&confirm('Remove this combination from the draft? Existing real cases are not connected.')){w.combinations=w.combinations.filter(x=>x.id!==c.id);ui.comboId=w.combinations[0].id;changed();render()}return}
+ if(a==='remove-combination'){const {w,c}=getEditing();if(!w.fallback&&w.combinations.length>1){incAsk({msg:'Remove this combination from the draft? Existing real cases are not connected.'}).then(ok=>{if(ok){w.combinations=w.combinations.filter(x=>x.id!==c.id);ui.comboId=w.combinations[0].id;changed();render()}})}return}
  if(a==='edit-step'){openStep(Number(el.dataset.step));return}
- if(a==='remove-second'){const {c}=getEditing();if(confirm('Remove the second review from this draft combination?')){c.second=null;changed();render()}return}
+ if(a==='remove-second'){const {c}=getEditing();if(true){incAsk({msg:'Remove the second review from this draft combination?'}).then(ok=>{if(ok){c.second=null;changed();render()}})}return}
  if(a==='toggle-external'){const {c}=getEditing();if(!c.external.enabled)openExternal();else{c.external.enabled=false;changed();render()}return}
  if(a==='external'){openExternal();return}if(a==='edit-action'){openAction(el.dataset.id);return}
- if(a==='delete-action'){if(confirm('Remove this follow-up action from the draft?')){const d=ui.modal.data,c=wfBy(d.wId).combinations.find(c=>c.id===d.cId);c.actions=c.actions.filter(x=>x.id!==d.e.id);closeModal(true);changed();render()}return}
+ if(a==='delete-action'){if(true){incAsk({msg:'Remove this follow-up action from the draft?'}).then(ok=>{if(ok){const d=ui.modal.data,c=wfBy(d.wId).combinations.find(c=>c.id===d.cId);c.actions=c.actions.filter(x=>x.id!==d.e.id);closeModal(true);changed();render()}})}return}
  if(a==='routing'){openRouting();return}if(a==='edit-sla'){openSla(el.dataset.id);return}
  if(a==='apply-editor'){applyEditor();return}
  if(a==='notification-preview'){openNotification(el.dataset.id);return}if(a==='signature-preview'){openSignature(el.dataset.id);return}
@@ -817,7 +817,7 @@ const rIso=ms=>new Date(ms).toISOString();
 let rState=null;
 const rUI={tab:'reports',reportFilter:'all',patientFilter:'residents',search:'',view:'home',form:null,formDirty:false,error:'',successId:null,detailId:null};
 const rNow=()=>Date.now()+(rState?.offsetMinutes||0)*60000;
-const rFmt=t=>t?new Date(t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Not provided';
+const rFmt=t=>{if(!t)return 'Not provided';const d=new Date(t),other=d.getFullYear()!==new Date(rNow()).getFullYear();return d.toLocaleString('en-US',{month:'short',day:'numeric',...(other?{year:'numeric'}:{}),hour:'numeric',minute:'2-digit'})};
 const rDate=t=>t?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'Not provided';
 const rEscapeLines=v=>esc(v).replace(/\n/g,'<br>');
 function rEmptyForm(){return {id:null,type:'',subtype:'',severity:'',urgency:'',affected:[],patients:[],employees:[],others:[],programs:[],eventDate:'',eventTime:'',timeUnknown:false,approximate:false,discoveryDate:'',discoveryTime:'',sources:[],sourceRole:'',sourceName:'',description:'',injury:'',injured:[],injuryDetails:'',response:'',tags:[],responseDetails:'',attachments:[],involvedPatients:[],involvedEmployees:[],involvedOthers:[],caused:[],typeUnsure:false,affectedNone:false,involvedNone:false,affectedStash:null,involvedStash:null}}
@@ -841,7 +841,7 @@ function rReport(rid){return rState.reports.find(r=>r.id===rid)}
 function rPatient(pid){return PATIENTS.find(p=>p.id===pid)}
 function rCanPatient(pid){return rState.patientAccess&&rPatient(pid)?.allowed===true}
 function rHasHidden(r){return r.form.patients.some(pid=>!rCanPatient(pid))}
-function rNames(form){const values=[...form.patients.map(pid=>rCanPatient(pid)?rPatient(pid)?.name:'Patient details restricted'),...form.employees.map(eid=>EMPLOYEES.find(e=>e.id===eid)?.name||'Employee'),...form.others];return values.length?values.join(', '):form.affected.includes('none')?'No person affected':form.affected.includes('unknown')?'Unknown person':form.affected.includes('patient')?'Patient not identified':form.affected.includes('employee')?'Employee not identified':'None named'}
+function rNames(form){const values=[...form.patients.map(pid=>rCanPatient(pid)?rPatient(pid)?.name:'Patient details restricted'),...form.employees.map(eid=>EMPLOYEES.find(e=>e.id===eid)?.name||'Employee'),...form.others];return values.length?values.join(', '):form.affected.includes('none')?'No person affected':form.affected.includes('unknown')?'Unknown person':form.affected.includes('patient')?'Patient not identified':form.affected.includes('employee')?'Employee not identified':'None added'}
 function rClass(form){const t=typeBy(form.type),s=t?.subs.find(s=>s.id===form.subtype);return s?`${t.name} → ${s.name}`:'Not assigned'}
 function rShortClass(form){return typeBy(form.type)?.subs.find(s=>s.id===form.subtype)?.name||'Not assigned'}
 function rStatus(r){return ({submitted:'Submitted',under_review:'Under review',closed:'Closed'})[r.status]||r.status}
@@ -858,11 +858,11 @@ for(const q of r.clarifications){const remaining=(new Date(q.dueAt)-rNow())/6000
 function rPending(){return rOwn().flatMap(r=>r.clarifications.filter(q=>q.status==='outstanding').map(q=>({r,q})))}
 function rIsOverdue(r){return r.status!=='closed'&&((!r.acceptedAt&&new Date(r.acceptanceDue)<rNow())||(!r.reviewCompletedAt&&new Date(r.reviewDue)<rNow()))}
 function rOpenEsc(r){return r.escalations.some(e=>e.status!=='addressed')}
-function rDisplayEvent(f){if(f.timeUnknown)return 'Event date/time not known';const parts=[];if(f.eventDate){const [y,m,d]=f.eventDate.split('-');parts.push(`${m}/${d}/${y}`)}else parts.push('Date not provided');parts.push(f.eventTime||'Time not provided');return parts.join(' · ')+(f.approximate?' · Approximate':'')}
+function rDisplayEvent(f){if(f.timeUnknown)return 'Event date and time not known';if(!f.eventDate)return 'Not provided';const t=f.eventTime?rFmt(f.eventDate+'T'+f.eventTime):rDate(f.eventDate);return t+(f.approximate?' · Approximate':'')}
 function rB(text,action,cls='',attrs='',ic=''){return `<button type="button" class="btn ${cls}" data-r="${action}" ${attrs}>${ic?icon(ic,14):''}${text}</button>`}
 function rEmpty(message,title='Nothing to show',ic='file'){return `<div class="r-empty">${icon(ic,24)}<strong>${title}</strong>${message}</div>`}
 function rGroups(c=store.published){return (listBy(c.typeList)?.items||[]).map(t=>{const map=c.typeLinks.find(m=>m.typeId===t.id);return {...t,items:map?.useSubtypes?(listBy(map.subtypeList)?.items||[]).filter(s=>s.active!==false):[]}}).filter(t=>t.items.length)}
-function rWorkspace(which){if(rUI.formDirty&&!confirm('Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'))return;closeModal(true);rUI.formDirty=false;if(which==='admin'){ui.workspace='admin';rUI.view='home'}else{ui.workspace='reporter';rUI.view='home'}render();window.scrollTo(0,0)}
+function rWorkspace(which){if(rUI.formDirty&&incGuard({msg:'Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'},()=>rWorkspace(which)))return;closeModal(true);rUI.formDirty=false;if(which==='admin'){ui.workspace='admin';rUI.view='home'}else{ui.workspace='reporter';rUI.view='home'}render();window.scrollTo(0,0)}
 render=function(){if(ui.workspace==='admin'){$('#admin-shell').hidden=false;$('#reporter-shell').hidden=true;oldRender()}else{$('#admin-shell').hidden=true;$('#reporter-shell').hidden=false;rRender()}};
 function rShell(content){return `<div class="r-shell"><aside class="r-side" aria-label="Reporter workspace"><div class="brand"><div class="brandmark">${icon('shield',22)}</div><div><strong>Incident</strong><small>Reporting workspace</small></div></div><div class="org"><strong>${esc(store.published.facility)}</strong><p>${esc(RLOCATION.name)} · Current location</p></div><div class="nav-label">Workspace</div><nav class="nav"><button class="${rUI.view==='home'?'active':''}" data-r="home">${icon('catalog',18)} Reporter home</button><button class="${rUI.view==='form'?'active':''}" data-r="new-report">${icon('plus',18)} Report incident</button></nav><div class="sidefoot"><div class="scope-note">Your reports and permitted patient history.<br>No inferred patient risk labels.</div><button class="btn workspace-link" data-r="workspace-admin">${icon('settings',15)} Facility admin preview</button><div class="profile"><div class="avatar">JL</div><div><strong>Jordan Lee</strong><small>Reporter · EMP-1042</small></div></div></div></aside><header class="r-top"><div class="crumb"><span>Incident reporting</span><span>/</span><b>${rUI.view==='form'?'New report':rUI.view==='success'?'Submission received':'Reporter home'}</b></div><div class="r-identity">${icon('building',15)}<b>${esc(RLOCATION.name)}</b><span class="pill outline">${REPORTER.name} · ${REPORTER.id}</span></div></header><div class="r-demo"><span>Prototype v0.5 · Fictional people and incidents · Local browser storage only</span><button class="textbtn" data-r="demo-tools">${icon('settings',13)} Scenario tools</button></div><main class="r-main" id="reporter-main" tabindex="-1">${content}</main></div>`}
 function rRender(){rSweep();$('#reporter-shell').innerHTML=rShell(rUI.view==='form'?rFormView():rUI.view==='success'?rSuccessView():rHome());}
@@ -900,7 +900,7 @@ ${f.response==='yes'?`<div class="r-field"><label>Actions taken · select any th
 ${f.response?rField(f.response==='yes'?'Response details · optional':'Explanation · optional',rArea('responseDetails',f.response==='yes'?'Describe what was done, by whom, and other known details. You can write an action that is not in the suggested list.':'Explain what you know. For example, a call was attempted but nobody answered.','maxlength="3500"'),''):''}</div></section>
 <section class="r-formcard" id="r-attachments"><div class="r-formhead"><span class="rank">4</span><div><h2>Attachments</h2><p></p></div></div><div class="r-formbody"><label class="r-upload" for="r-files">${icon('upload',25)}<div><strong>Add attachments</strong><small>Choose files</small></div><input type="file" id="r-files" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.txt,.docx"></label>${rAttachmentList(f.attachments,'form')}<small class="r-helper"></small></div></section><footer class="r-formfooter"><small>${f.id?'Saved draft '+esc(f.id):''}</small><div class="actions">${rB('Cancel','home')}${rB('Save draft','save-report-draft')}${rB('Review and submit','review-report','primary','','arrow')}</div></footer></form></div><aside class="r-formnav"><div class="card"><div class="cardbody"><h3>In this report</h3>${[['r-people','Affected people'],['r-details','Incident details'],['r-response','Injury & response'],['r-attachments','Attachments']].map(([a,n],i)=>`<a href="#${a}"><span class="navmark${rSectionDone(a,f)?' done':''}">${rSectionDone(a,f)?icon('check',13):i+1}</span>${n}${a==='r-attachments'?' <span class="tiny muted">optional</span>':''}</a>`).join('')}</div></div><div class="card"><div class="cardbody"><h3>What happens next?</h3><p style="margin-top:9px">The review team may ask for clarification.</p><hr class="hr"><p></p></div></div></aside></div>`}
 function rAttachmentList(arr,context='view'){return arr?.length?`<div class="r-chips">${arr.map((a,i)=>`<span class="r-chip">${icon('file',12)}${esc(a.name)} <span class="tiny muted">${Math.ceil(a.size/1024)} KB</span>${context==='form'?`<button type="button" data-r="remove-attachment" data-index="${i}" aria-label="Remove ${esc(a.name)}">${icon('close',11)}</button>`:''}</span>`).join('')}</div>`:''}
-function rStartReport(pid=null,draftId=null){if(rUI.formDirty&&!confirm('Discard unsaved form changes? Save a draft first to retain them.'))return;closeModal(true);if(draftId){const d=rState.drafts.find(d=>d.id===draftId);if(!d)return;const blocked=d.form.patients.some(pid=>!rCanPatient(pid));if(blocked){toast('This draft contains patient information outside the current demo access. Restore the permitted access profile to continue.',true);return}rUI.form=clone(d.form)}else{rUI.form=rEmptyForm();if(pid){if(!rCanPatient(pid)){toast('Patient access is not permitted in this preview.',true);return}rUI.form.affected=['patient'];rUI.form.patients=[pid]}}rUI.formDirty=false;rUI.error='';rUI.view='form';render();window.scrollTo(0,0)}
+function rStartReport(pid=null,draftId=null){if(rUI.formDirty&&incGuard({msg:'Discard unsaved form changes? Save a draft first to retain them.'},()=>rStartReport(pid,draftId)))return;closeModal(true);if(draftId){const d=rState.drafts.find(d=>d.id===draftId);if(!d)return;const blocked=d.form.patients.some(pid=>!rCanPatient(pid));if(blocked){toast('This draft contains patient information outside the current demo access. Restore the permitted access profile to continue.',true);return}rUI.form=clone(d.form)}else{rUI.form=rEmptyForm();if(pid){if(!rCanPatient(pid)){toast('Patient access is not permitted in this preview.',true);return}rUI.form.affected=['patient'];rUI.form.patients=[pid]}}rUI.formDirty=false;rUI.error='';rUI.view='form';render();window.scrollTo(0,0)}
 function rSaveDraft(){const f=clone(rUI.form);if(!f.id)f.id=id('DRAFT');rUI.form.id=f.id;const old=rState.drafts.find(d=>d.id===f.id),entry={id:f.id,form:f,savedAt:rIso(rNow()),location:REPORTER.location,reporterId:REPORTER.id};if(old)Object.assign(old,entry);else rState.drafts.unshift(entry);const saved=rPersist();rUI.formDirty=!saved;render();toast(saved?'Draft saved. It hasn’t been submitted yet.':'Couldn’t save the draft. Browser storage isn’t available. Keep this page open.',!saved)}
 function rValidation(f){const errors=[];if(!f.subtype)errors.push('Choose an incident type.');if(!f.description.trim())errors.push('Describe what happened, even briefly.');if(f.subtype&&!rGroups().some(t=>t.id===f.type&&t.items.some(s=>s.id===f.subtype)))errors.push('This classification is no longer available. Clear it or choose an available subtype.');if(f.patients.some(pid=>!rCanPatient(pid)))errors.push('A selected patient is not available under the current access profile.');if(f.severity&&!(listBy(store.published.severityList)?.items||[]).some(s=>s.id===f.severity))errors.push('Select an available severity, or leave it unassessed.');return errors}
 function rSummary(f){const sourceLabels={witnessed:'Witnessed',experienced:'Happened to me',told:'Someone told me',discovered:'Discovered afterward'};return `<div class="r-summarylist"><div><small>Affected people / context</small><strong>${esc(rNames(f))}</strong></div><div><small>Location</small><strong>${RLOCATION.name}${f.place?' · '+esc(f.place):''}</strong></div><div><small>Classification</small><strong>${esc(rClass(f))}</strong></div><div><small>Severity / urgency</small><strong>${esc(levelName(f.severity))} · Urgent: ${{yes:'Yes',no:'No',unknown:'Not sure'}[f.urgency]||'Not answered'}</strong></div><div><small>Event timing</small><strong>${esc(rDisplayEvent(f))}</strong></div><div><small>Program / subprogram</small><strong>${f.programs.length?f.programs.map(esc).join(', '):'Not assigned'}</strong></div></div>${f.discoveryDate||f.discoveryTime?`<div class="r-sourcestrip">Discovered: ${esc(f.discoveryDate||'Date not provided')} · ${esc(f.discoveryTime||'Time not provided')}</div>`:''}<div class="r-summaryblock"><h3>What happened?</h3><p>${esc(f.description)}</p></div><div class="r-summaryblock"><h3>Source of information</h3><p>${f.sources.length?f.sources.map(s=>sourceLabels[s]).join('; '):'Not provided — eyewitness status is not inferred.'}${f.sources.includes('told')?`<br>Original source: ${esc(f.sourceRole||'Role not known')}${f.sourceName?' · '+esc(f.sourceName):' · Name not provided'}`:''}</p></div><div class="r-summaryblock"><h3>Injury</h3><p>${f.affected.includes('none')?'Not applicable':({yes:'Injury identified',no:'No injury identified',unknown:'Not sure'})[f.injury]||'Not provided'}${f.injuryDetails?'\n'+esc(f.injuryDetails):''}${f.injured.length?'\nInjured: '+rParticipantOptions(f).filter(x=>f.injured.includes(x.id)).map(x=>esc(x.name)).join(', '):''}</p></div><div class="r-summaryblock"><h3>Immediate response</h3><p>${({yes:'Help given right away',no:'No help given right away',unknown:'Not sure'})[f.response]||'Not provided'}</p>${f.response==='yes'&&f.tags.length?`<div class="r-chips">${f.tags.map(t=>`<span class="r-chip">${esc(t)}</span>`).join('')}</div>`:''}${f.responseDetails?`<p style="margin-top:9px">${esc(f.responseDetails)}</p>`:''}</div>${f.attachments.length?`<div class="r-summaryblock"><h3>Attachment references</h3>${rAttachmentList(f.attachments)}<p class="tiny muted" style="margin-top:8px">Metadata only in this prototype. No file contents retained.</p></div>`:''}`}
@@ -921,7 +921,7 @@ function rDemoTools(){if(rUI.view==='form'&&rUI.formDirty){toast('Save your draf
 function rDemoEvent(action){const rid=$('#r-demo-record')?.value,r=rReport(rid);if(!r)return;const now=rIso(rNow());if(action==='demo-accept'){if(!r.acceptedAt){r.acceptedAt=now;r.status='under_review';rLog(r,'Demo reviewer accepted the initial review. Existing deadlines were not restarted.')}else toast('This initial review was already accepted.')}
 if(action==='demo-complete'){if(!r.acceptedAt)r.acceptedAt=now;r.reviewCompletedAt=now;r.status='under_review';rLog(r,'Demo incoming event: initial review completed. Follow-up and the incident itself remain open.');}
 if(action==='demo-question'){const f=r.flow.settings,sla=clone(r.flow.slaLibrary.find(s=>s.id===f.clarificationSla));const q={id:id('Q'),question:'Please share any further details you know about the immediate response. If the information is unavailable, explain what you could not establish.',requestedBy:groupName(r.flow.group),issuedAt:now,dueAt:rDue(now,sla),slaSnapshot:sla,status:'outstanding',response:'',responseType:'answer',respondedAt:null,attachments:[]};r.clarifications.push(q);rNotify(r,f.clarificationNotification,REPORTER.id,q.id);rLog(r,'Demo reviewer issued a clarification request. A separate response deadline now applies.');}
-if(action==='demo-ack'||action==='demo-address'){const e=r.escalations.find(e=>e.status!=='addressed');if(!e){toast('This record has no open escalation.',true);return}if(!e.ackAt)e.ackAt=now;if(action==='demo-ack'){e.status='acknowledged';e.updates.push({at:now,source:'Demo receiving team',text:'A responsible reviewer has accepted this escalation. It remains open until addressed.'})}else{e.status='addressed';e.addressedAt=now;e.updates.push({at:now,source:'Demo receiving team',text:'The escalation was reviewed and the case’s next responsible steps were checked. This closes the escalation only, not the incident.'})}rNotify(r,r.flow.settings.escalationUpdateNotification,REPORTER.id,e.id);rLog(r,action==='demo-ack'?'Escalation acknowledged in the example. The concern is not yet resolved.':'Escalation addressed in the example. Incident status is unchanged.');}rPersist();closeModal(true);render();rOpenReport(rid);toast('Fictional incoming event applied. No real reviewer action or message was performed.')}
+if(action==='demo-ack'||action==='demo-address'){const e=r.escalations.find(e=>e.status!=='addressed');if(!e){toast('This record has no open escalation.',true);return}if(!e.ackAt)e.ackAt=now;if(action==='demo-ack'){e.status='acknowledged';e.updates.push({at:now,source:'Demo receiving team',text:'A responsible reviewer has accepted this escalation. It remains open until addressed.'})}else{e.status='addressed';e.addressedAt=now;e.updates.push({at:now,source:'Demo receiving team',text:'The escalation was reviewed and the case’s next responsible steps were checked. This closes the escalation only, not the incident.'})}rNotify(r,r.flow.settings.escalationUpdateNotification,REPORTER.id,e.id);rLog(r,action==='demo-ack'?'Escalation acknowledged in the example. The concern is not yet resolved.':'Escalation addressed in the example. Incident status is unchanged.');}rPersist();closeModal(true);render();rOpenReport(rid);toast('Update applied.')}
 function rEvents(){const events=rState.events.slice(-30).reverse();showModal('demo-events','Simulated delivery events','These are recorded delivery requests, not sent messages.',`<div class="card"><table><thead><tr><th>Report / time</th><th>Template</th><th>Recipient</th></tr></thead><tbody>${events.map(e=>`<tr><td>${esc(e.reportId)}<br><small>${rFmt(e.at)}</small></td><td>${esc(notifBy(e.template)?.name||e.template)}</td><td>${esc(e.recipient===REPORTER.id?'Submitting employee':groupName(e.recipient))}</td></tr>`).join('')||'<tr><td colspan="3">No events in this session.</td></tr>'}</tbody></table></div>${note('The event log intentionally omits sensitive narratives and reporter identity from notification message bodies.')}`,rB('Back to demo tools','demo-tools'),{center:true})}
 // Event wiring. data-r controls are reporter/addition controls; legacy data-act controls remain untouched.
 document.addEventListener('click',event=>{const el=event.target.closest('[data-r]');if(!el||el.disabled)return;const a=el.dataset.r;try{
@@ -940,8 +940,8 @@ if(a==='view-report'){if(ui.modal?.dirty&&!confirm('Discard the unsaved response
 if(a==='escalate'){rOpenEscalate(el.dataset.id);return}if(a==='submit-escalation'){rSubmitEscalate(el.dataset.id);return}if(a==='patient-history'){rOpenHistory(el.dataset.id);return}
 if(a==='add-information'){rOpenAddition(el.dataset.id);return}if(a==='save-addition'){const r=rReport(el.dataset.id),f=$('#r-addition-form');if(!r||!f?.reportValidity())return;const text=$('#r-addition-text').value.trim();if(!text)return;r.additions.push({at:rIso(rNow()),text,by:REPORTER.id});rLog(r,'Reporter added information. Original submitted account preserved.');rPersist();closeModal(true);rOpenReport(r.id);toast('Dated addition saved without replacing the original report.');return}
 if(a==='demo-tools'){rDemoTools();return}if(a==='advance-clock'){rState.offsetMinutes+=30;rSweep();rPersist();closeModal(true);render();rDemoTools();return}if(a.startsWith('demo-')){rDemoEvent(a);return}if(a==='event-log'){rEvents();return}
-if(a==='export-demo'){download('Incident_Reporter_and_Config_v0_5_Demo.json',JSON.stringify({version:VERSION,exportedAt:rIso(rNow()),scope:'Fictional browser-only prototype; not a clinical record',reporter:rState,admin:store},null,2));toast('Fictional data and configuration exported.');return}
-if(a==='reset-reporter'){if(confirm('Reset fictional reports, drafts, clock, and access preview? Admin configuration will be retained.')){rState=rSeed();rPersist();rUI.view='home';rUI.formDirty=false;rUI.search='';rUI.reportFilter='all';rUI.tab='reports';closeModal(true);render();toast('Reporter sample data reset.')}return}
+if(a==='export-demo'){download('Incident_Reporter_and_Config_v0_5_Demo.json',JSON.stringify({version:VERSION,exportedAt:rIso(rNow()),scope:'Fictional browser-only prototype; not a clinical record',reporter:rState,admin:store},null,2));toast('Data and configuration exported.');return}
+if(a==='reset-reporter'){if(true){incAsk({msg:'Reset fictional reports, drafts, clock, and access preview? Admin configuration will be retained.'}).then(ok=>{if(ok){rState=rSeed();rPersist();rUI.view='home';rUI.formDirty=false;rUI.search='';rUI.reportFilter='all';rUI.tab='reports';closeModal(true);render();toast('Reporter sample data reset.')}})}return}
 }catch(err){console.error(err);toast('The demo could not complete this interaction. Your last saved data is retained.',true)}});
 function rFilesMeta(files){return Array.from(files).slice(0,10).map(f=>({name:f.name,size:f.size,type:f.type||'Unknown'}))}
 document.addEventListener('change',event=>{const el=event.target;
@@ -981,7 +981,7 @@ Object.assign(paths,{
 /* ---------- Inert shell controls and information popovers ---------- */
 document.addEventListener('click',e=>{
   const inert=e.target.closest('[data-inert]');
-  if(inert){toast('This control isn’t part of the prototype.');return}
+  if(inert){toast('Coming soon.');return}
   const goto=e.target.closest('[data-goto]');
   if(goto){const t=document.getElementById(goto.dataset.goto);if(t){t.scrollIntoView({behavior:'smooth',block:'start'});const f=t.querySelector('input:not([type=hidden]),textarea,select,button');if(f)f.focus({preventScroll:true})}return}
   const b=e.target.closest('[data-info]');
@@ -1159,7 +1159,7 @@ function vrDetail(){const r=rState.reports.find(x=>x.id===vr.detailId);if(!r){vr
 function vrRender(){document.body.dataset.ws='reviewer';$('#admin-shell').hidden=false;$('#reporter-shell').hidden=true;$('#content').innerHTML=`<div class="vr-main">${vr.detailId?vrDetail():vrQueue()}</div>`;$('#subtabs').hidden=true;$('#pinbar').hidden=true;$('#tr').innerHTML=`<button class="ib" type="button" data-inert aria-label="Notifications">${icon('bell',20)}</button><button class="ib" type="button" data-inert aria-label="Settings">${icon('settings',20)}</button><button class="pill-me" type="button" data-inert><span class="nm">Morgan Davis<small>Incident reviewer</small></span><span class="avatar">MD</span></button>`;$('#band').innerHTML=`<div class="band-l"><span class="band-t">Incident Review</span><span class="band-d">${esc(RLOCATION.name)} · ${esc(store.published.facility)}</span></div><span class="pill outline"></span>`;$('#wsbar').innerHTML=`<div class="ws-tabs"><span class="ws-tab" aria-current="page">Incident Review</span></div><div class="ws-foot"><span>Fictional data · Reviewer demo</span></div>`;const v=$('#view-as');if(v)v.value='reviewer'}
 const vrOldRender=render;
 render=function(){if(ui.workspace==='reviewer')vrRender();else vrOldRender()};
-rWorkspace=function(which){if(rUI.formDirty&&!confirm('Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'))return;closeModal(true);rUI.formDirty=false;ui.workspace=which==='admin'?'admin':which==='reviewer'?'reviewer':'reporter';if(which!=='reviewer')rUI.view='home';vr.detailId=null;render();window.scrollTo(0,0)};
+rWorkspace=function(which){if(rUI.formDirty&&incGuard({msg:'Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'},()=>rWorkspace(which)))return;closeModal(true);rUI.formDirty=false;ui.workspace=which==='admin'?'admin':which==='reviewer'?'reviewer':'reporter';if(which!=='reviewer')rUI.view='home';vr.detailId=null;render();window.scrollTo(0,0)};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-vr]');if(!b)return;const a=b.dataset.vr;const r=rState.reports.find(x=>x.id===vr.detailId);if(a==='open'){vr.detailId=b.dataset.id;render();window.scrollTo(0,0);return}if(a==='back'){vr.detailId=null;render();return}if(!r)return;if(a==='accept'){r.acceptedAt=rIso(rNow());r.status='under_review';rLog(r,'Initial review accepted by incident reviewer (demo).')}if(a==='save-assessment'||a==='complete'){const notes=$('#vr-assessment')?.value.trim()||'';if(!notes){toast('Enter review findings before saving or completing the review.',true);return}r.vrAssessment=notes;if(a==='complete'){if(r.clarifications.some(q=>q.status==='outstanding')){toast('Outstanding reporter clarification must be assessed before completing this example review.',true);return}r.reviewCompletedAt=rIso(rNow());rLog(r,'Initial review completed by incident reviewer (demo). Case not closed.')}else rLog(r,'Reviewer assessment notes saved (demo).')}if(a==='clarify'){const q=$('#vr-question')?.value.trim();if(!q){toast('Enter a specific clarification question.',true);return}r.clarifications.push({id:'Q-'+Date.now(),question:q,requestedBy:'Morgan Davis',issuedAt:rIso(rNow()),dueAt:rDue(rIso(rNow()),rSla(store.published,'SLA-CLARIFY')),slaSnapshot:clone(rSla(store.published,'SLA-CLARIFY')),status:'outstanding',response:'',responseType:'answer',respondedAt:null,attachments:[]});rLog(r,'Reviewer requested clarification from reporter (demo).')}rPersist();render();toast(a==='complete'?'Review completed; case remains open.':a==='clarify'?'Clarification request added to reporter queue.':a==='accept'?'Review accepted.':'Assessment saved.')});
 document.addEventListener('input',e=>{if(e.target.id==='vr-search'){const val=e.target.value,pos=e.target.selectionStart;vr.search=val;vrRender();const next=$('#vr-search');next?.focus();next?.setSelectionRange(pos,pos)}});
 document.addEventListener('change',e=>{if(e.target.id==='vr-filter'){vr.filter=e.target.value;vrRender()}});
@@ -1310,7 +1310,7 @@ table tbody tr,.r-table tbody tr,.vr-table tbody tr{height:62px}
 table tbody tr:hover,.r-table tbody tr:hover,.vr-table tbody tr:hover {background:#f7fbfe}
 table tbody td,.r-table tbody td,.vr-table tbody td{padding-top:14px;padding-bottom:14px}
 table td .two,.r-table td .two{line-height:1.4}
-.r-footnote,.ownership-note,.rulefoot,.tablefoot{color:#728399}
+.r-footnote,.ownership-note,.rulefoot,.tablefoot{color:#5d7183}
 .r-tabs{border-radius:var(--radius-md) var(--radius-md) 0 0}
 .r-tab{border-radius:var(--radius-sm) var(--radius-sm) 0 0}
 .r-panel {border-radius:var(--radius-md)}
@@ -1445,7 +1445,7 @@ document.addEventListener('click',e=>{
   if(start&&ui.workspace==='reporter'){rpUseDrawer=true;rpPreviousFocus=document.activeElement}
 },true);
 function rpClose(){
-  if(rUI.formDirty&&!confirm('Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'))return;
+     if(rUI.formDirty&&incGuard({msg:'Discard this report? Your changes aren’t saved. Select Cancel to go back and save a draft.'},()=>rpClose()))return;
   rUI.formDirty=false;rUI.error='';rUI.view='home';rpUseDrawer=true;render();
   if(rpPreviousFocus?.isConnected)rpPreviousFocus.focus();
 }
@@ -1577,7 +1577,7 @@ document.addEventListener('click',e=>{
     if(second.signature&&!confirm('Demo confirmation only. No production e-signature is created.'))return;
     v.secondDone=rIso(rNow());v.secondReviewer=name.trim();rLog(r,`Independent second review recorded in demo by ${name.trim()}. Case remains open.`);
   }
-  rPersist();render();toast('Saved in this browser-only prototype.');
+  rPersist();render();toast('Changes saved.');
 });
 
 </script>
@@ -1597,7 +1597,7 @@ rRender=function(){r12PriorRender();if(ui.workspace==='reporter'&&rUI.view==='fo
 .r-report-tabs{display:flex;align-items:stretch;gap:22px;padding:0 22px;border-bottom:1px solid #e1e7ed;overflow-x:auto;scrollbar-width:thin}
 .r-report-tabs button{border:0;border-bottom:2px solid transparent;background:transparent;color:#52677b;padding:15px 1px 13px;white-space:nowrap;font-size:13px;cursor:pointer}
 .r-report-tabs button.active{border-bottom-color:#20639b;color:#1d4f78;font-weight:650}
-.r-report-tabs .count{display:inline-block;font-size:11px;color:#66798a;background:#edf2f6;margin-left:7px;padding:2px 6px;border-radius:4px}
+.r-report-tabs .count{display:inline-block;font-size:11px;color:#5d7183;background:#edf2f6;margin-left:7px;padding:2px 6px;border-radius:4px}
 .r-report-tabs button.active .count{background:#dfeefa;color:#1d4f78}
 .r-report-toolbar{padding:16px 22px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .r-report-toolbar .search{width:min(420px,100%)}
@@ -1612,7 +1612,7 @@ rRender=function(){r12PriorRender();if(ui.workspace==='reporter'&&rUI.view==='fo
 .r-person-combobox input[type=search]{border:0;min-width:170px;flex:1;box-shadow:none;outline:none;padding:7px 3px;background:transparent}
 .r-person-combobox + .r-results{z-index:20}
 .r-affected-options{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap}
-.r-affected-divider{display:flex;align-items:center;gap:10px;margin:13px 0 11px;color:#8b99a7;font-size:12px}
+.r-affected-divider{display:flex;align-items:center;gap:10px;margin:13px 0 11px;color:#66747f;font-size:12px}
 .r-affected-divider:before,.r-affected-divider:after{content:"";height:1px;background:#e2e8ee;flex:1}
 .r-affected-alternatives{display:flex;gap:18px;flex-wrap:wrap}
 .r-affected-alternatives label,.r-affected-options label{display:inline-flex;gap:7px;align-items:center;font-size:13px}
@@ -1868,16 +1868,16 @@ body[data-ws="admin"] .dialog{border-radius:4px}
 .v15-workflows .tablewrap{overflow-x:auto}
 .v15-workflows table{min-width:780px;width:100%}
 .v15-workflows table th:last-child,.v15-workflows table td:last-child{text-align:right}
-.v15-workflows td small{display:block;color:#697a87;margin-top:4px;line-height:1.45}
+.v15-workflows td small{display:block;color:#5d7183;margin-top:4px;line-height:1.45}
 .v15-workflows td:nth-child(2){max-width:340px}
 .v15-rowlink{border:0;background:transparent;color:#106a86;font-weight:600;cursor:pointer;padding:0;text-align:left}
 .v15-rowlink:hover{text-decoration:underline}
 .v15-search{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #e2e8ec}
 .v15-search input{width:min(430px,100%);border:1px solid #d2dee5;border-radius:4px;padding:10px 12px}
 .v15-search span{font-size:12px;color:#60727f}
-body[data-ws="reviewer"] .v15-decision .v15-optional{font-weight:400;color:#7a8994}
+body[data-ws="reviewer"] .v15-decision .v15-optional{font-weight:400;color:#66747f}
 body[data-ws="reviewer"] .v15-reviewoutcome{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border:1px solid #e0e8ec;border-radius:4px;background:#fafcfd;font-size:12px}
-.v15-reviewoutcome>span:first-child{color:#667a86}.v15-reviewoutcome strong{font-size:13px}.v15-sig{color:#905b16;background:#fff1d8;border-radius:3px;padding:4px 6px}
+.v15-reviewoutcome>span:first-child{color:#5d7183}.v15-reviewoutcome strong{font-size:13px}.v15-sig{color:#905b16;background:#fff1d8;border-radius:3px;padding:4px 6px}
 .v15-primary{width:100%;justify-content:center}
 @media(max-width:790px){body[data-ws="admin"] .dialog:not(.center){width:100%;border-radius:0}body[data-ws="admin"] #band .band-r{justify-content:flex-end}.v15-pagebar h1{font-size:20px}}
 
@@ -1974,7 +1974,7 @@ body[data-ws="reviewer"] .v15-reviewoutcome{display:flex;gap:8px;align-items:cen
 .v16-backdrop{position:absolute;inset:0;background:rgba(15,39,55,.34)}
 .v16-panel{position:relative;width:min(82vw,1180px);height:100%;background:#f7fafc;display:flex;flex-direction:column;border-radius:4px 0 0 4px;overflow:hidden;box-shadow:-14px 0 46px rgba(21,42,57,.16)}
 .v16-panelheader{flex:none;display:flex;align-items:center;justify-content:space-between;gap:18px;background:white;padding:14px 22px;border-bottom:1px solid #dce5eb}
-.v16-panelheader small{color:#738392;font-size:12px}.v16-panelheader h2{font-size:18px;font-weight:650;margin-top:3px}
+.v16-panelheader small{color:#657380;font-size:12px}.v16-panelheader h2{font-size:18px;font-weight:650;margin-top:3px}
 .v16-panelheader button{width:34px;height:34px;font-size:24px;background:#eef3f6;border:0;border-radius:4px;cursor:pointer}
 .v16-panelbody{flex:1;min-height:0;overflow:auto;padding:20px 22px}
 .v16-editor .pagehead h1{font-size:22px}.v16-editor .pagehead{margin-bottom:15px}
@@ -1984,7 +1984,7 @@ body[data-ws="reviewer"] .v15-reviewoutcome{display:flex;gap:8px;align-items:cen
 .v16-editor .v16-description textarea{width:100%;border:1px solid #d5e0e7;border-radius:4px;padding:10px 12px;font:inherit;resize:vertical}
 .v16-editor .reviewsteps{gap:12px}.v16-editor .reviewcard,.v16-editor .card{border-radius:4px!important}
 .v16-panelfooter{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:white;border-top:1px solid #dce5eb;padding:14px 22px}
-.v16-panelfooter>span{color:#667988;font-size:12px}.v16-panelfooter>div{display:flex;gap:10px}
+.v16-panelfooter>span{color:#627483;font-size:12px}.v16-panelfooter>div{display:flex;gap:10px}
 .v16-panelbody>.dialog{width:100%!important;min-height:100%;height:auto!important;box-shadow:none!important;display:flex;flex-direction:column;background:transparent;border-radius:0!important}
 .v16-panelbody>.dialog .dialoghead{display:none}.v16-panelbody>.dialog .dialogbody{padding:0!important;overflow:visible!important;flex:1}
 .v16-panelbody>.dialog .dialogfoot{position:sticky;bottom:-20px;background:white;margin:20px -22px -20px;padding:14px 22px;border-top:1px solid #dae4ea;z-index:2}
@@ -2069,7 +2069,7 @@ body[data-ws="reviewer"] .v15-reviewoutcome{display:flex;gap:8px;align-items:cen
   };
   closeModal=function(force=false){
     if(!embedded)return priorClose(force);
-    if(!force&&ui.modal?.dirty&&!confirm('Discard unapplied changes in this editor?'))return;
+    if(!force&&ui.modal?.dirty&&incGuard({msg:'Discard unapplied changes in this editor?'},()=>closeModal(true)))return;
     embedded=false;
     drawer()?.querySelector('.v16-panelbody .dialog')?.remove();
     priorClose(true);syncDrawer();
@@ -2110,8 +2110,8 @@ body[data-ws="reviewer"] #band,body[data-ws="reporter"] #band{display:none!impor
 .unified-tabs{display:flex;align-items:center;gap:5px;padding:0 28px;background:#fff;border-bottom:1px solid #e3e8ee;overflow-x:auto}
 .unified-tab{padding:15px 15px 13px;border:0;border-bottom:2px solid transparent;background:none;color:#647384;cursor:pointer;white-space:nowrap;font-size:13px;font-weight:600}
 .unified-tab.active{border-color:#2074ad;color:#135b89}
-.unified-tab span{color:#82909c}
-.unified-access{font:12px system-ui;background:#f5f7f9;color:#667789;border:1px solid #dce3e9;border-radius:5px;padding:8px}
+.unified-tab span{color:#68737d}
+.unified-access{font:12px system-ui;background:#f5f7f9;color:#627284;border:1px solid #dce3e9;border-radius:5px;padding:8px}
 .unified-main{min-width:0}
 .unified-main .r-pagehead,.unified-main .r-widgets,.unified-main .r-tabs,.unified-main .r-tabhint,.unified-main .vr-head{display:none!important}
 .unified-main .r-panel{border:0!important;box-shadow:none!important;border-radius:0!important}
@@ -2129,8 +2129,8 @@ body[data-ws="reviewer"] #band,body[data-ws="reporter"] #band{display:none!impor
 .unified-patient-table tr:hover td{background:#f7fbfd}
 .unified-patient-table button{font-size:12px}
 .unified-patient-name{font-weight:650;color:#233d50}
-.unified-patient-id{color:#798795;font-size:11px;margin-top:4px}
-.unified-patient-footer{padding:13px 20px;display:flex;align-items:center;justify-content:space-between;color:#71808f;font-size:12px}
+.unified-patient-id{color:#66717d;font-size:11px;margin-top:4px}
+.unified-patient-footer{padding:13px 20px;display:flex;align-items:center;justify-content:space-between;color:#667381;font-size:12px}
 .unified-admin-return{margin-right:8px}
 body[data-ws="admin"] #wsbar{display:none!important}
 #wsbar{display:none!important}
@@ -2177,7 +2177,7 @@ body[data-ws="admin"] #band{display:none!important}
   vrRender=function(){const v=origVrRender();attach();return v};
   function showTab(tab){
     if(!allowed().includes(tab))return;
-    if(rUI.formDirty&&!confirm('Leave the report without saving?'))return;
+    if(rUI.formDirty&&incGuard({msg:'Leave the report without saving?'},()=>showTab(tab)))return;
     const activeAccess=U.access;
     U.tab=tab;rUI.view='home';rUI.tab=tab==='patients'?'patients':'reports';vr.detailId=null;
     if(tab==='reviews')rWorkspace('reviewer');else rWorkspace('reporter');
@@ -2200,15 +2200,15 @@ body[data-ws="admin"] #band{display:none!important}
 /* Unified operational tables: reviewer is the functional baseline, care-settings reference is visual baseline. */
 .u18-table-shell{display:flex;flex-direction:column;width:100%;min-width:0;min-height:clamp(500px,calc(100vh - 228px),900px);background:white;border:1px solid #d5dee6;border-radius:4px;overflow:hidden}
 .u18-tabs{display:flex;gap:26px;align-items:center;overflow-x:auto;padding:0 16px;border-bottom:1px solid #e1e7ec;background:#fff;white-space:nowrap}
-.u18-tabs button{padding:13px 0 12px;background:transparent;border:0;border-bottom:2px solid transparent;color:#6b7986;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;cursor:pointer;white-space:nowrap}
+.u18-tabs button{padding:13px 0 12px;background:transparent;border:0;border-bottom:2px solid transparent;color:#5d7183;font-family:inherit;font-size:12px;font-weight:600;line-height:1.4;cursor:pointer;white-space:nowrap}
 .u18-tabs button.active{border-bottom-color:#135b8c;color:#104e79}
 .u18-tabs .count{font-weight:500;color:inherit}
 .u18-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 14px;background:#fff;border-bottom:1px solid #e0e7ed}
 .u18-search{display:flex;align-items:center;border:1px solid #d0dbe3;border-radius:3px;width:min(350px,100%);height:34px;background:#fff;position:relative}
 .u18-search input{border:0!important;outline:0;box-shadow:none!important;min-width:0;width:100%;height:100%;padding:7px 34px 7px 10px!important;font:13px/1.3 inherit;background:transparent}
-.u18-search svg{position:absolute;right:9px;color:#6d8091;pointer-events:none}
+.u18-search svg{position:absolute;right:9px;color:#627382;pointer-events:none}
 .u18-select{border:1px solid #d0dbe3;border-radius:3px;background:#fff;padding:7px 28px 7px 10px;min-width:155px;max-width:240px;height:34px;font-size:12px;color:#334b5d}
-.u18-count{margin-left:auto;font-size:12px;color:#70808e;white-space:nowrap}
+.u18-count{margin-left:auto;font-size:12px;color:#657380;white-space:nowrap}
 .u18-scroll{flex:1;min-height:0;overflow:auto;background:#fff}
 .u18-table{width:100%;min-width:1220px;border-collapse:collapse;table-layout:auto}
 .u18-table.patient-table{min-width:900px}
@@ -2223,9 +2223,9 @@ body[data-ws="admin"] #band{display:none!important}
 .u18-table .v16-status{display:inline-flex;font-weight:650}
 .u18-table .u18-act{padding:5px 9px;border:1px solid #cfdae3;background:#fff;border-radius:3px;color:#235b81;font-size:12px;cursor:pointer;white-space:nowrap}
 .u18-table .u18-act:hover{background:#eaf4fb}
-.u18-table .u18-muted{color:#7f8b96}
-.u18-empty{text-align:center!important;padding:45px 16px!important;color:#7a8795!important;font-weight:400!important}
-.u18-pagination{display:flex;align-items:center;gap:14px;justify-content:space-between;border-top:1px solid #dce4ea;background:#fff;padding:9px 12px;font-size:12px;color:#64798a;flex-wrap:wrap}
+.u18-table .u18-muted{color:#68727b}
+.u18-empty{text-align:center!important;padding:45px 16px!important;color:#66747f!important;font-weight:400!important}
+.u18-pagination{display:flex;align-items:center;gap:14px;justify-content:space-between;border-top:1px solid #dce4ea;background:#fff;padding:9px 12px;font-size:12px;color:#5d7183;flex-wrap:wrap}
 .u18-pagination .right{display:flex;align-items:center;gap:9px;margin-left:auto}
 .u18-pagination select{height:30px;border:1px solid #d1dce4;background:#fff;border-radius:3px;color:#335467;padding:4px 6px;font-size:12px}
 .u18-pagination button{height:30px;min-width:30px;background:#fff;border:1px solid #d4dee6;border-radius:3px;color:#31566e;cursor:pointer}
@@ -2332,7 +2332,7 @@ html,body{height:100%;overflow:hidden}
 .u18-icon-action:hover,.u18-icon-action:focus-visible{background:#e8f2f9;border-color:#b9d4e7;outline:none}
 .u18-icon-action+.u18-icon-action{margin-left:4px}
 .u19-screenbar{height:50px;position:fixed;bottom:0;left:0;right:0;display:flex;align-items:stretch;justify-content:center;gap:0;z-index:60;background:#e9eef4;border-top:1px solid #c6d4df}
-.u19-screenbar button{min-width:165px;padding:0 25px;display:flex;align-items:center;justify-content:center;gap:9px;border:0;border-top:3px solid transparent;background:transparent;color:#657a8d;font-size:13px;font-weight:600;cursor:pointer}
+.u19-screenbar button{min-width:165px;padding:0 25px;display:flex;align-items:center;justify-content:center;gap:9px;border:0;border-top:3px solid transparent;background:transparent;color:#5f7385;font-size:13px;font-weight:600;cursor:pointer}
 .u19-screenbar button.active{color:#164b76;background:#fff;border-top-color:#165c91}
 .u19-screenbar button:disabled{opacity:.45;cursor:not-allowed}
 .u19-screenbar button svg{flex:none}
@@ -2384,7 +2384,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 .unified-admin-return{display:none!important}
 .unified-head .unified-access{display:none!important}
 .unified-head label:has(#unified-access){display:none!important}
-.u20-demo-access{display:flex;align-items:center;gap:4px;border-left:1px solid #cbd3da;padding:0 8px;margin-left:6px;font-size:10px;color:#747f8a;white-space:nowrap}
+.u20-demo-access{display:flex;align-items:center;gap:4px;border-left:1px solid #cbd3da;padding:0 8px;margin-left:6px;font-size:10px;color:#68727c;white-space:nowrap}
 .u20-demo-access select{font-size:10px;height:22px;max-width:145px;border:1px solid #c9d2da;border-radius:2px;padding:2px 4px;background:#fff;color:#455e71}
 .unified-tabs{padding:0 18px!important;min-height:38px;background:#fff!important}
 .unified-tab{padding:11px 14px 10px!important;font-size:12px!important}
@@ -2394,11 +2394,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 #admin-shell .vr14-main{padding:0!important}
 .u18-table-shell{background:#fff!important}
 .u19-screenbar{height:32px!important;min-height:32px!important;background:var(--u20-bottom)!important;border-top:1px solid #bcc9d5!important;justify-content:flex-start!important;gap:0!important;padding:0!important;align-items:stretch!important}
-.u19-screenbar button{height:31px!important;min-width:auto!important;padding:0 13px!important;border:0!important;border-right:1px solid #d2d9df!important;border-top:0!important;font-size:11px!important;font-weight:500!important;gap:5px!important;color:#7a838b!important;background:#f3f3f3!important;border-radius:0!important}
+.u19-screenbar button{height:31px!important;min-width:auto!important;padding:0 13px!important;border:0!important;border-right:1px solid #d2d9df!important;border-top:0!important;font-size:11px!important;font-weight:500!important;gap:5px!important;color:#6b737a!important;background:#f3f3f3!important;border-radius:0!important}
 .u19-screenbar button.active{background:#0c467f!important;color:#fff!important;font-weight:600!important}
 .u19-screenbar button:disabled{opacity:1!important;color:#999!important;background:#fafafa!important}
-.u19-screenbar .u20-home,.u19-screenbar .u20-menu{min-width:31px!important;padding:0 7px!important;color:#687c8d!important;background:#fff!important}
-.u19-screenbar .u20-right{display:flex;align-items:center;gap:10px;margin-left:auto;min-width:0;color:#929292;font-size:10px;white-space:nowrap;padding-right:12px}
+.u19-screenbar .u20-home,.u19-screenbar .u20-menu{min-width:31px!important;padding:0 7px!important;color:#607282!important;background:#fff!important}
+.u19-screenbar .u20-right{display:flex;align-items:center;gap:10px;margin-left:auto;min-width:0;color:#727272;font-size:10px;white-space:nowrap;padding-right:12px}
 .u20-right .u20-copyright{overflow:hidden;text-overflow:ellipsis}
 #wsbar{display:none!important}
 @media(max-width:960px){.u20-copyright{display:none!important}.u20-demo-access{padding:0 4px}}
@@ -2560,7 +2560,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
       <div class="c22-source-field"><label for="c22-main-category-list">Main category list</label>
         ${sel('typeList',[['','Select a main list'],...LISTS.filter(l=>l.kind==='types').map(l=>[l.id,l.name])],main,'data-bind="typeList" id="c22-main-category-list" aria-label="Main category list"')}
       </div><div class="c22-section-divider"></div>
-      <section class="c22-tablebox"><div class="c22-search"><h2>${esc(listBy(main)?.name||'Incident main categories')}</h2><div class="search">${icon('search',15)}<input type="search" placeholder="Search incident categories" aria-label="Search incident categories" data-search-table="c22-types-table"></div></div>
+      <section class="c22-tablebox"><div class="c22-search"><h2>${esc(listBy(main)?.name||'Incident types')}</h2><div class="search">${icon('search',15)}<input type="search" placeholder="Search incident categories" aria-label="Search incident categories" data-search-table="c22-types-table"></div></div>
       <table id="c22-types-table" class="c22-table"><thead><tr><th>Main category</th><th>Subtype list (optional)</th><th>Subtypes</th></tr></thead><tbody>
       ${data.map(t=>{const link=config().typeLinks.find(m=>m.typeId===t.id);const linked=link?.useSubtypes&&link.subtypeList?link.subtypeList:'';const child=linked?listBy(linked)?.items||[]:[];return `<tr data-search="${esc((t.name+' '+child.map(c=>c.name).join(' ')).toLowerCase())}"><td><strong>${esc(t.name)}</strong></td><td>${sel('sub-'+t.id,options(),linked,`data-c22-map="${t.id}" aria-label="Subtype list for ${esc(t.name)}"`)}</td><td>${child.length?`<details class="c34-subtypes"><summary>${child.length} ${child.length===1?'subtype':'subtypes'} ${icon('list',15)}</summary><div class="c34-subtype-popover" role="group" aria-label="Subtypes of ${esc(t.name)}"><strong>${esc(t.name)} · Subtypes</strong><ul>${child.map(c=>`<li>${esc(c.name)}</li>`).join('')}</ul></div></details>`:'<span class="muted">—</span>'}</td></tr>`}).join('')}
       </tbody></table><div class="c22-foot">A main category can be used without a subtype list.</div></section></div>`;
@@ -2631,7 +2631,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
   };
   closeModal = function(force=false){
     if(ui.modal?.c22Inline){
-      if(!force&&ui.modal.dirty&&!confirm('Discard unapplied changes?'))return;
+      if(!force&&ui.modal.dirty&&incGuard({msg:'Discard unapplied changes?'},()=>closeModal(true)))return;
       document.getElementById('c22-inline-editor')?.replaceChildren();
       const el=document.getElementById('c22-inline-editor');if(el)el.hidden=true;
       ui.modal=null;return;
@@ -2678,7 +2678,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 .c23-field input:not([type="checkbox"]),.c23-field select,.c23-field textarea,.c23-readonly,.c23-multiselect>summary{width:100%;font:inherit;font-size:12px;font-weight:400;color:#243c54;background:#fff;border:1px solid #cad6e0;border-radius:4px;min-height:36px;padding:9px 11px;box-sizing:border-box}
 .c23-field textarea{height:61px;resize:vertical;line-height:1.4}
 .c23-field select{appearance:none;padding-right:34px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='%23516c85' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-size:15px;background-position:right 12px center}
-.c23-readonly{background:#f8fafc;color:#67798d}
+.c23-readonly{background:#f8fafc;color:#617285}
 .c23-multiselect{position:relative;min-width:0}
 .c23-multiselect>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:12px}
 .c23-multiselect>summary::-webkit-details-marker{display:none}
@@ -2701,7 +2701,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 .c23-combo-item{text-align:left;min-width:0;flex:1;border:0;background:transparent;border-radius:4px;padding:12px 11px;cursor:pointer;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:6px;color:#2b4862;overflow-wrap:anywhere}
 .c23-combo-row.selected .c23-combo-item{color:#124e83}
 .c23-combo-row:hover:not(.selected){background:#eef3f8}
-.c23-delete-combo{flex-shrink:0;width:26px;height:26px;color:#66788a;margin-right:4px}
+.c23-delete-combo{flex-shrink:0;width:26px;height:26px;color:#627384;margin-right:4px}
 .c23-delete-combo:disabled{opacity:.3;cursor:not-allowed}
 .c23-configuration{min-width:0;border:0;border-radius:4px;padding:16px}
 .c23-accordions{display:flex;flex-direction:column;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #e4eaf0}
@@ -2721,10 +2721,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 .c23-switch input:focus-visible+.c23-switch-track{outline:2px solid #347cb2;outline-offset:2px}
 .c23-toggle{min-height:36px;border:1px solid #d6e0e8;border-radius:4px;padding:7px 10px}
 .c23-followup-top,.c23-followup-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.c23-followup-top{color:#64788b;font-size:12px;padding:0 0 9px}
+.c23-followup-top{color:#607385;font-size:12px;padding:0 0 9px}
 .c23-followup-row{border-top:1px solid #edf0f4;padding:11px 0;font-size:12px}
 .c23-followup-row>div:first-child{display:flex;flex-direction:column;gap:4px}
-.c23-followup-row span{color:#687a8c}
+.c23-followup-row span{color:#627384}
 .c23-followup-actions{white-space:nowrap}
 .c23-action-card{border:1px solid #e1e8ef;border-radius:4px;margin-top:10px;background:#fff}
 .c23-action-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:39px;padding:5px 10px;background:#f6f9fb;border-bottom:1px solid #e3eaf0}
@@ -2736,7 +2736,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
 .c23-flex{flex:1}
 .c23-enabled{display:flex;align-items:center;gap:7px;color:#516a80;font-size:12px}
 .c23-footer .btn{min-width:100px}
-.c23-empty{border:1px dashed #d3dee8;padding:25px;color:#66798c;font-size:12px}
+.c23-empty{border:1px dashed #d3dee8;padding:25px;color:#627486;font-size:12px}
 .c23-accordion .c22-inline{box-shadow:none;border:1px solid #ccdeed}
 .c23-accordion .c22-inline-body{max-width:none}
 .c23-accordion .c22-inline-body #editor-form>.field,.c23-accordion .c22-inline-body #editor-form>.formsection{max-width:none}
@@ -3091,7 +3091,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#f7f8fa}
     }
     if(el.matches('[data-act="c23-cancel"]')){discard();e.stopImmediatePropagation();return;}
     if(el.matches('[data-act="c23-disable"]')){
-      if(w.enabled&&confirm('Disable this workflow? Existing reports are not changed.')){w.enabled=false;save(false);}
+      if(w.enabled){incAsk({msg:'Disable this workflow? Existing reports are not changed.'}).then(ok=>{if(ok){w.enabled=false;save(false);}})}
       e.stopImmediatePropagation();return;
     }
     if(el.matches('[data-act="c23-save"]')){save(false);e.stopImmediatePropagation();return;}
@@ -3259,7 +3259,7 @@ body:has(#modal-root .backdrop:not(.center)) .c23-workspace{visibility:hidden}
 .mvp-action{border:1px solid #c9d6e0;border-radius:4px;background:#fff;color:#173e61;min-width:105px;max-width:130px;height:30px;padding:0 8px;font-size:12px;cursor:pointer}
 .mvp-action:focus-visible,.mvp-link:focus-visible{outline:2px solid #2463a5;outline-offset:2px}
 .mvp-detail{display:grid;gap:12px}.mvp-decisionline{display:flex;align-items:center;gap:12px;margin-bottom:5px;color:#64758a;font-size:12px;flex-wrap:wrap}
-.mvp-review-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.mvp-history{margin:0 0 10px}.mvp-history small{display:block;color:#6d7a88}
+.mvp-review-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.mvp-history{margin:0 0 10px}.mvp-history small{display:block;color:#667380}
 .mvp-report-summary .r-recordheading{margin-top:20px}.mvp-report-summary .r-sourcestrip{margin-top:13px}
 
 </style>
@@ -3364,7 +3364,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .mvp-more summary::-webkit-details-marker{display:none}.mvp-more summary:hover,.mvp-more summary:focus-visible{background:#e8f2f9;border-color:#b9d4e7;outline-offset:2px}
 .mvp-more-menu{position:absolute;right:0;top:100%;min-width:165px;background:#fff;border:1px solid #cfdae5;border-radius:6px;box-shadow:0 7px 20px #15345424;z-index:30;padding:5px}
 .mvp-more-menu button{display:block;width:100%;background:transparent;color:#21445f;border:0;text-align:left;padding:9px 10px;font:inherit;font-size:12px;border-radius:4px;cursor:pointer}.mvp-more-menu button:hover,.mvp-more-menu button:focus-visible{background:#edf5fb}
-.mvp-menu-note{display:block;color:#68798a;font-size:11px;padding:8px;white-space:normal}
+.mvp-menu-note{display:block;color:#647484;font-size:11px;padding:8px;white-space:normal}
 .mvp-reset{background:transparent;border:1px solid #c1cad3;color:#496376;font-size:11px;padding:4px 9px;border-radius:4px;white-space:nowrap;cursor:pointer;margin-right:8px}
 .mvp-reset:hover,.mvp-reset:focus-visible{background:#e7f0f7;color:#183f5d}
 @media(max-width:700px){.mvp-reset{font-size:10px;padding:4px 6px;margin-right:2px}}
@@ -3431,11 +3431,9 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  }
  addSamples();
  const priorRender=render;
- render=function(){const res=priorRender();const bar=document.getElementById('u19-screenbar');if(bar){let reset=bar.querySelector('.mvp-reset');if(!reset){reset=document.createElement('button');reset.type='button';reset.className='mvp-reset';reset.setAttribute('title','Restore original sample data');reset.textContent='Reset prototype';bar.querySelector('.u20-right')?.prepend(reset)}}return res};
+ render=function(){const res=priorRender();const bar=document.getElementById('u19-screenbar');if(bar){let reset=bar.querySelector('.mvp-reset');if(!reset){reset=document.createElement('button');reset.type='button';reset.className='mvp-reset';reset.setAttribute('title','Restore original sample data');reset.textContent='Reset prototype';bar.querySelector('.u20-right')?.prepend(reset)}if(!bar.querySelector('.mvp-demo')){const note=document.createElement('span');note.className='mvp-demo';note.textContent='Prototype with fictional data';bar.querySelector('.u20-right')?.prepend(note)}}return res};
  document.addEventListener('click',event=>{const target=event.target.closest('.mvp-reset');if(!target)return;
-  if(!confirm('Reset the prototype to its original sample data? This clears changed reports, review decisions, drafts, and configuration saved in this browser. This cannot be undone.'))return;
-  try{localStorage.removeItem(REPORTER_KEY);localStorage.removeItem(KEY)}catch(error){toast('Browser storage could not be cleared.',true);return}
-  location.reload();
+  incAsk({msg:'Reset the prototype to its original sample data?'}).then(ok=>{if(!ok)return;try{localStorage.removeItem(REPORTER_KEY);localStorage.removeItem(KEY)}catch(error){toast('Browser storage could not be cleared.',true);return}location.reload()});
  });
  document.addEventListener('click',event=>{if(event.target.closest('.mvp-more'))return;document.querySelectorAll('.mvp-more[open]').forEach(x=>x.open=false)},true);
  document.addEventListener('click',event=>{const summary=event.target.closest('.mvp-more summary');if(!summary)return;const item=summary.parentElement;
@@ -3508,13 +3506,13 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  }
  function change(r,to){const from=status(r),v=r.mvpReview||(r.mvpReview={}),now=rIso(rNow());if(from===to)return;
   if(!v.owner){toast('Accept this report before changing its status.',true);render();return}
-  const back=(message,apply)=>{if(!confirm(message)){render();return false}apply();return true};
+  const back=(message,apply)=>{incAsk({msg:message}).then(ok=>{if(!ok){render();return}apply();rPersist();render();toast(`Status updated to ${status(r)}.`)})};
   if(to==='Rejected'){openDecision(r,'rejected');return}
-  if(to==='Reported'){if(!back('Return this report to Reported? This removes its review assignment and any decision.',()=>{v.owner=null;v.outcome=null;v.decision=null;v.signedBy=null;v.signedAt=null;v.signatureImg=null;v.reviews=[];(r.mvpActions||[]).forEach(a=>{a.startAt=null;a.completedAt=null;a.completedBy=null});v.reason=null;v.firstCompleted=false;v.followup=null;v.closed=false;v.externalPending=false;r.acceptedAt=null;r.reviewCompletedAt=null;r.status='submitted';rLog(r,`Report returned to Reported by ${actor}.`)}))return}
-  else if(to==='In Review'){if(!back('Move this report back to In Review?',()=>{v.owner=v.owner||actor;v.outcome=null;v.decision=null;v.reason=null;v.followup=null;v.closed=false;v.reviews=v.firstCompleted?(v.reviews||[]).slice(0,1):[];(r.mvpActions||[]).forEach(a=>{if(!a.completedAt)a.startAt=null});r.reviewCompletedAt=null;r.acceptedAt=r.acceptedAt||now;r.status='under_review';rLog(r,`Report moved back to In Review by ${actor}.`)}))return}
+  if(to==='Reported'){back('Return this report to Reported? This removes its review assignment and any decision.',()=>{v.owner=null;v.outcome=null;v.decision=null;v.signedBy=null;v.signedAt=null;v.signatureImg=null;v.reviews=[];(r.mvpActions||[]).forEach(a=>{a.startAt=null;a.completedAt=null;a.completedBy=null});v.reason=null;v.firstCompleted=false;v.followup=null;v.closed=false;v.externalPending=false;r.acceptedAt=null;r.reviewCompletedAt=null;r.status='submitted';rLog(r,`Report returned to Reported by ${actor}.`)});return}
+  else if(to==='In Review'){back('Move this report back to In Review?',()=>{v.owner=v.owner||actor;v.outcome=null;v.decision=null;v.reason=null;v.followup=null;v.closed=false;v.reviews=v.firstCompleted?(v.reviews||[]).slice(0,1):[];(r.mvpActions||[]).forEach(a=>{if(!a.completedAt)a.startAt=null});r.reviewCompletedAt=null;r.acceptedAt=r.acceptedAt||now;r.status='under_review';rLog(r,`Report moved back to In Review by ${actor}.`)});return}
   else{
    if(needsSign(r)){openDecision(r,'approved',to);return}
-   if(ORDER.indexOf(to)<ORDER.indexOf(from)&&!back(`Move this report back to ${to}?`,()=>{}))return;
+   if(ORDER.indexOf(to)<ORDER.indexOf(from)){back(`Move this report back to ${to}?`,()=>{applyTarget(r,to);rLog(r,`Status changed to ${to} by ${actor}.`)});return}
    applyTarget(r,to);rLog(r,`Status changed to ${to} by ${actor}.`);
   }
   rPersist();render();toast(`Status updated to ${status(r)}.`);
@@ -3581,11 +3579,11 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .v32-review-shell .vr14-pagination button,.v32-review-shell .vr14-pagination select{height:30px;border:1px solid #d4dee6;background:#fff;border-radius:3px;padding:4px 8px}
 .v32-modal-content{display:grid;gap:11px;max-width:530px}
 .v32-decision-details{display:grid;grid-template-columns:110px minmax(0,1fr);gap:9px 12px;padding:12px;background:#f6f9fb;border:1px solid #e2e9ef;border-radius:5px;font-size:12px}
-.v32-decision-details span{color:#687c8c}.v32-decision-details strong{color:#1f4058;font-weight:600}
+.v32-decision-details span{color:#5d7183}.v32-decision-details strong{color:#1f4058;font-weight:600}
 .v32-label{display:block;font-size:12px;font-weight:600;color:#254761;margin-top:3px}.v32-label span{color:#ae3b40}
 .v32-input{display:block;width:100%;border:1px solid #cbd7e0;border-radius:4px;background:#fff;color:#243e53;padding:9px 11px;font:inherit;font-size:13px}
 .v32-input:focus-visible{outline:2px solid #276b9f;outline-offset:2px}.v32-check{display:flex;align-items:flex-start;gap:9px;font-size:12px;line-height:1.5;color:#344d60;margin-top:3px}
-.v32-check input{margin-top:3px}.v32-hint{font-size:11px;color:#687c8c;margin:0}.v32-error{color:#a12429;background:#fff1f1;padding:9px;border-radius:4px;font-size:12px}
+.v32-check input{margin-top:3px}.v32-hint{font-size:11px;color:#5d7183;margin:0}.v32-error{color:#a12429;background:#fff1f1;padding:9px;border-radius:4px;font-size:12px}
 .v33-secondary{display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:53px;padding:5px 12px;background:#fff;border:1px solid #c4d1dd;border-radius:4px;color:#285678;font-size:12px;font-family:inherit;font-weight:600;white-space:nowrap;cursor:pointer}
 .v33-secondary:hover,.v33-secondary:focus-visible{background:#e9f2fa;border-color:#96bad3;outline-offset:2px}
 .u18-actions .v33-secondary{min-width:56px}
@@ -3738,7 +3736,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 /* Shared table component: tabs, toolbar, sortable header, footer. */
 .tbl-shell{background:#fff}
 .tbl-tabs{display:flex;gap:26px;align-items:center;overflow-x:auto;padding:0 16px;border-bottom:1px solid #e1e7ec;background:#fff;white-space:nowrap;flex:none}
-.tbl-tabs button{padding:13px 0 12px;background:transparent;border:0;border-bottom:2px solid transparent;color:#6b7986;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;white-space:nowrap}
+.tbl-tabs button{padding:13px 0 12px;background:transparent;border:0;border-bottom:2px solid transparent;color:#5d7183;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;cursor:pointer;white-space:nowrap}
 .tbl-tabs button span{font-weight:500;color:inherit}
 .tbl-tabs button:hover{color:#104e79}
 .tbl-tabs button.active{border-bottom-color:#135b8c;color:#104e79}
@@ -3751,7 +3749,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .tbl-search input{padding:0 10px 0 34px;box-shadow:none}
 .tbl-select select{appearance:none;-webkit-appearance:none;padding:0 30px 0 34px;cursor:pointer;text-overflow:ellipsis}
 .tbl-search input:focus-visible,.tbl-select select:focus-visible{outline:2px solid #1c75a2;outline-offset:1px;border-color:#1c75a2}
-.tbl-select select:disabled{background:#f3f6f8;color:#7d8c99;cursor:not-allowed}
+.tbl-select select:disabled{background:#f3f6f8;color:#66747f;cursor:not-allowed}
 .tbl-sic,.tbl-chv{position:absolute;top:50%;transform:translateY(-50%);display:flex;align-items:center;pointer-events:none;color:#5d7487}
 .tbl-sic{left:11px}
 .tbl-chv{right:10px}
@@ -3778,14 +3776,14 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .tbl-table tbody tr{cursor:pointer}
 .tbl-table tbody tr:hover td{background:#f3f8fc}
 .tbl-table tbody tr:focus-visible{outline:2px solid #1c75a2;outline-offset:-2px}
-.tbl-table td.tbl-empty{text-align:center;color:#7a8795;padding:45px 16px;height:auto;white-space:normal}
+.tbl-table td.tbl-empty{text-align:center;color:#66747f;padding:45px 16px;height:auto;white-space:normal}
 .tbl-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:8px}
 .tbl-btn{display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:56px;padding:0 12px;box-sizing:border-box;background:#fff;border:1px solid #c4d1dd;border-radius:4px;color:#285678;font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer}
 .tbl-btn:hover{background:#e9f2fa;border-color:#96bad3}
 .tbl-btn:focus-visible{outline:2px solid #1c75a2;outline-offset:2px}
 .tbl-btn.primary{background:#1A4F85;border-color:#1A4F85;color:#fff}
 .tbl-btn.primary:hover{background:#143F6B;border-color:#143F6B}
-.tbl-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;flex:none;border-top:1px solid #dce4ea;background:#fff;padding:9px 16px;font-size:12px;color:#64798a}
+.tbl-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;flex:none;border-top:1px solid #dce4ea;background:#fff;padding:9px 16px;font-size:12px;color:#5d7183}
 .tbl-foot-r{display:flex;align-items:center;gap:8px;margin-left:auto}
 .tbl-foot-r label[for]{margin-right:2px}
 .tbl-pg{display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:30px;padding:0 8px;box-sizing:border-box;background:#fff;border:1px solid #d4dee6;border-radius:4px;color:#31566e;font-family:inherit;font-size:12px;cursor:pointer}
@@ -3793,7 +3791,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .tbl-pg.on{background:#1c5885;border-color:#1c5885;color:#fff;font-weight:600}
 .tbl-pg:disabled{opacity:.35;cursor:default}
 .tbl-pg:focus-visible{outline:2px solid #1c75a2;outline-offset:2px}
-.tbl-gap{color:#7a8795;padding:0 2px}
+.tbl-gap{color:#66747f;padding:0 2px}
 @media(max-width:680px){.tbl-select,.tbl-search{width:100%}.tbl-foot-r{margin-left:0;flex-wrap:wrap}}
 
 /* The review decision dialog must sit above the report panel. */
@@ -3817,7 +3815,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .ip-overlay .vr-fact .mvp-status{margin-top:2px}
 /* filters as labelled fields: [Label | All] */
 .tbl-select.tbl-field{width:236px;display:inline-flex;align-items:stretch;height:36px;border:1px solid #d0dbe3;border-radius:4px;background:#fff;box-sizing:border-box}
-.tbl-field .tbl-flabel{display:flex;align-items:center;flex:none;padding:0 10px 0 12px;border-right:1px solid #e1e8ee;color:#7b8996;font-size:12px;white-space:nowrap;background:#f7f9fb;border-radius:3px 0 0 3px}
+.tbl-field .tbl-flabel{display:flex;align-items:center;flex:none;padding:0 10px 0 12px;border-right:1px solid #e1e8ee;color:#67737e;font-size:12px;white-space:nowrap;background:#f7f9fb;border-radius:3px 0 0 3px}
 .tbl-select.tbl-field select{border:0;border-radius:0 3px 3px 0;height:100%;flex:1;min-width:0;padding:0 28px 0 10px;background:transparent;color:#243c54}
 .tbl-select.tbl-field select:focus-visible{outline:none}
 .tbl-select.tbl-field:focus-within{outline:2px solid #1c75a2;outline-offset:1px;border-color:#1c75a2}
@@ -3830,7 +3828,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .c39-patient{border:1px solid #dce5ec;background:#f6f9fb;border-radius:6px;padding:12px 14px;margin-bottom:18px}
 .c39-patient h3{margin:0 0 8px;font-size:14px;font-weight:650;color:#1f3a53}
 .c39-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px}
-.c39-facts small{display:block;color:#6a7c8c;font-size:11px;margin-bottom:2px}
+.c39-facts small{display:block;color:#627281;font-size:11px;margin-bottom:2px}
 .c39-facts strong{font-size:12px;font-weight:600;color:#243c54}
 .c39-timeline{list-style:none;margin:0;padding:0 0 0 18px;position:relative}
 .c39-timeline::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:#dbe5ed}
@@ -3844,7 +3842,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .c39-act{margin-top:4px}
 .c39-link{background:none;border:0;padding:2px 0;color:#1A4F85;font-size:12px;font-weight:600;cursor:pointer}
 .c39-link:hover{text-decoration:underline}
-.c39-muted,.c39-empty{color:#7a8895;font-size:12px}
+.c39-muted,.c39-empty{color:#66747f;font-size:12px}
 </style>
 <script data-bundled-from="table-system-v36.js">
 /* One table component for My Reports, My Reviews and Patients, and one report panel for reporter and reviewer. */
@@ -3904,9 +3902,17 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
    return `<th scope="col" aria-sort="${on?(dir==='asc'?'ascending':'descending'):'none'}"><button type="button" class="tbl-sort${on?' on':''}" data-tbl="sort" data-kind="${kind}" data-key="${c.k}" data-first="${c.first||'asc'}" aria-label="Sort by ${esc(c.label)}">${c.label}${sortIcon(dir)}</button></th>`;
   }).join('');
   const width=cols.reduce((n,c)=>n+c.w,0);
-  return `<div class="tbl-scroll"><table class="tbl-table" style="min-width:${width}px"><colgroup>${cols.map(c=>`<col style="width:${c.w}px">`).join('')}</colgroup><thead><tr>${head}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${cols.length}" class="tbl-empty">No matching ${NOUN[kind]}</td></tr>`}</tbody></table></div>`;
+  return `<div class="tbl-scroll"><table class="tbl-table" style="min-width:${width}px"><colgroup>${cols.map(c=>`<col style="width:${c.w}px">`).join('')}</colgroup><thead><tr>${head}</tr></thead><tbody>${rows.join('')||`<tr><td colspan="${cols.length}" class="tbl-empty">${emptyHtml(kind)}</td></tr>`}</tbody></table></div>`;
  }
- function tabs(kind,list,active,label){
+ function emptyHtml(kind){
+   const st=T[kind]||{},noun=NOUN[kind];
+   if(kind==='patients')return st.q&&String(st.q).trim()?`No patients match your search.`:'No patients to show yet.';
+   const narrowed=Boolean(String(st.q||'').trim()||st.f.type!=='all'||st.f.severity!=='all'||st.f.urgency!=='all'||st.quick||advCount(st));
+   if(narrowed)return `No ${noun} match your filters. <button type="button" class="tbl-clear tbl-empty-act" data-tbl="clear" data-kind="${kind}">Clear filters</button>`;
+   if(kind==='reports'&&st.tab==='Draft')return 'No drafts yet. Select Report incident to start one.';
+   return `No ${noun} in this view.`;
+  }
+  function tabs(kind,list,active,label){
   return `<nav class="tbl-tabs" aria-label="${label}">${list.map(([k,n,c])=>`<button type="button" data-tbl="tab" data-kind="${kind}" data-value="${k}" class="${active===k?'active':''}" aria-current="${active===k?'page':'false'}">${n} <span>(${c})</span></button>`).join('')}</nav>`;
  }
  function shell(kind,{tabsHtml='',toolbar,cols,rows,total,st}){
@@ -4122,6 +4128,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
  /* Valid next statuses for the one status dropdown. Rejection is only possible before a report is accepted. */
  function choicesFor(r){return rStatus(r)==='Rejected'?['Rejected']:REVIEW_STATUSES.filter(x=>x!=='Rejected')}
  /* Header controls of the review panel. The status dropdown is the same one the table uses, with the same rules. */
+  window.incStatusInfo=statusInfo;window.incNextInfo=nextInfo;
  window.incStatusField=function(r){
   const s=rStatus(r),choices=choicesFor(r),editable=Boolean(r.mvpReview&&r.mvpReview.owner)&&s!=='Rejected';
   const tip=s==='Rejected'?'A rejected report cannot be changed.':r.mvpReview&&r.mvpReview.firstCompleted?'First review is complete. A second reviewer must accept this report before its status can change.':'Accept the report to change its status.';
@@ -4277,7 +4284,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const sev=`<span class="rp-sev"><span class="tbl-sevdot" style="background:${esc(lv?(col[lv.id]||'#607D70'):'#a8b4bf')}" aria-hidden="true"></span>${esc(lv?lv.name:'Not sure')}</span>`;
   const urg=({yes:'Urgent',no:'Not urgent',unknown:'Not sure'})[f.urgency]||'Not sure';
   const type=(typeof rHasHidden==='function'&&rHasHidden(r))?'Incident details restricted':rShortClass(f);
-  const names=rNames(f),affected=names==='None named'?'None added':names;
+  const affected=rNames(f);
   const inv=[...(f.involvedPatients||[]).map(v=>rCanPatient(v)?(rPatient(v)||{}).name:'Patient details restricted'),...(f.involvedEmployees||[]).map(v=>(EMPLOYEES.find(e=>e.id===v)||{}).name||'Employee'),...(f.involvedOthers||[])];
   if(f.involvedNone)inv.push('No person involved');else if(f.involvedUnknown)inv.push('Unknown person');
   const involved=inv.length?inv.join(', '):'None added';
@@ -4390,8 +4397,8 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 .c22-tablebox.c36-wf:has(.c34-subtypes) .c22-table td:last-child{width:auto;white-space:nowrap}
 .c36-wf .c22-table td.c36-actions{display:table-cell;text-align:right;white-space:nowrap}
 .c36-wf .c36-actions .btn+.btn{margin-left:8px}
-.c36-off td:not(.c36-sw):not(.c36-actions){color:#7b8b99}
-.c36-off td strong{color:#6b7c8b}
+.c36-off td:not(.c36-sw):not(.c36-actions){color:#65727d}
+.c36-off td strong{color:#627280}
 .c36-switch{position:relative;display:inline-block;width:36px;height:20px;vertical-align:middle}
 .c36-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
 .c36-track{position:absolute;inset:0;border-radius:999px;background:#b4c2cf;transition:background .15s}
@@ -4444,7 +4451,7 @@ body.c38-has-footer #content{padding-bottom:84px}
 .c38-textbtn{background:none;border:0;padding:4px 6px;border-radius:3px;color:#1A4F85;font-size:12px;font-weight:600;cursor:pointer}
 .c38-textbtn:hover{text-decoration:underline}
 .c38-textbtn:focus-visible{outline:2px solid #1c75a2;outline-offset:1px}
-.c38-empty{margin:0;color:#6b7e8f;font-size:12px}
+.c38-empty{margin:0;color:#627484;font-size:12px}
 .c23-footer .btn.primary[data-act="c23-save"]{background:var(--brand,#1A4F85)!important;border-color:var(--brand,#1A4F85)!important;color:#fff!important}
 .c23-footer .btn.primary[data-act="c23-save"]:hover{background:var(--brand-hover,#143F6B)!important}
 </style>
@@ -4786,25 +4793,25 @@ body.c38-has-footer #content{padding-bottom:84px}
 .inc-w-ico{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:4px;background:#eaf1f8;color:#1A4F85}
 .inc-w-ico.warn{background:#fbeceb;color:#b3303a}
 .inc-w-head h3{margin:0;font-size:13px;font-weight:600;line-height:1.3;color:#2b4153}
-.inc-w-meta{margin-left:auto;font-size:12px;color:#64798a;white-space:nowrap}
+.inc-w-meta{margin-left:auto;font-size:12px;color:#5d7183;white-space:nowrap}
 .inc-w-body{display:flex;align-items:center;gap:22px;min-width:0}
 .inc-dn{position:relative;flex:none;width:112px;height:112px}
 .inc-dn svg{display:block;width:100%;height:100%}
 .inc-dn-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
 .inc-dn-c strong{font-size:28px;line-height:1;font-weight:500;color:#143f6b;font-variant-numeric:tabular-nums}
-.inc-dn-c span{margin-top:3px;font-size:11px;color:#64798a}
-.inc-dn-c.warn strong{color:#b3303a}.inc-dn-c.none strong{color:#7d8c99}
+.inc-dn-c span{margin-top:3px;font-size:11px;color:#5d7183}
+.inc-dn-c.warn strong{color:#b3303a}.inc-dn-c.none strong{color:#66747f}
 .inc-lg{flex:1;min-width:0;list-style:none;margin:0;padding:0}
 .inc-lg li{display:flex;align-items:center;gap:8px;min-width:0;padding:5px 0;font-size:12.5px;color:#1f2d3c;border-top:1px solid #edf1f4}
 .inc-lg li:first-child{border-top:0}
 .inc-lg .lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .inc-lg b{font-weight:600;font-variant-numeric:tabular-nums}
-.inc-lg .pct{width:34px;text-align:right;font-size:11.5px;color:#7d8c99;font-variant-numeric:tabular-nums}
+.inc-lg .pct{width:34px;text-align:right;font-size:11.5px;color:#66747f;font-variant-numeric:tabular-nums}
 .inc-w-dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
-.inc-lg li.zero{color:#8a98a5}.inc-lg li.zero b{font-weight:400}
+.inc-lg li.zero{color:#66747f}.inc-lg li.zero b{font-weight:400}
 .inc-w-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:auto;padding-top:12px;border-top:1px solid #e7edf2}
 .inc-w-body+.inc-w-foot{margin-top:14px}
-.inc-w-foot>small{margin-right:2px;font-size:12px;color:#64798a}
+.inc-w-foot>small{margin-right:2px;font-size:12px;color:#5d7183}
 .inc-chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;background:#f1f4f7;color:#44566a;font-size:12px;white-space:nowrap}
 .inc-chip b{font-weight:600;font-variant-numeric:tabular-nums;color:#1f2d3c}
 .inc-chip.hot{background:#fbeceb;color:#8f2630}.inc-chip.hot b{color:#8f2630}
@@ -4839,17 +4846,20 @@ body.c38-has-footer #content{padding-bottom:84px}
 .inc-m-meta{flex:none;font-size:12px;color:#66747f;white-space:nowrap}
 .inc-m .inc-seg{margin-left:auto;flex:none;height:22px;box-sizing:border-box}
 .inc-m .inc-seg button{height:100%;padding:0 8px;line-height:1}
+.inc-m{position:relative}
+.inc-m-corner{position:absolute;top:10px;right:14px;z-index:1}
+.inc-m.inc-m-sw .inc-m-head{padding-right:150px}
 .inc-m-grid{display:grid;grid-template-columns:repeat(3,minmax(0,auto));grid-auto-rows:24px;gap:6px 8px;justify-content:start;align-content:start;max-height:54px;overflow:auto}
 .inc-mcell{display:flex;align-items:center;gap:5px;height:24px;min-width:0;padding:0 9px;border:1px solid #dbe3ea;border-radius:12px;background:#fff;font:inherit;font-size:12px;color:#1f2d3c;cursor:pointer;white-space:nowrap;text-align:left}
 .inc-mcell .lab{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.inc-mcell .sep{flex:none;color:#8795a1}
+.inc-mcell .sep{flex:none;color:#66747f}
 .inc-mcell b{flex:none;font-weight:600;font-variant-numeric:tabular-nums}
 .inc-mcell.zero{color:#66747f}
 .inc-mcell:hover{background:#f3f7fb;border-color:#9db4c8}
 .inc-mcell[aria-pressed="true"]{background:#eaf1f8;border-color:#1A4F85;color:#143f6b}
 .inc-mcell:focus-visible{outline:2px solid #1c75a2;outline-offset:-2px}
-.inc-m-dn{flex:none;width:68px;height:68px}
-.inc-m-dn .inc-dn{width:68px;height:68px}
+.inc-m-dn{flex:none;align-self:flex-end;width:62px;height:62px}
+.inc-m-dn .inc-dn{width:62px;height:62px}
 .inc-m-dn .inc-dn-c strong{font-size:15px;font-weight:600}
 .inc-m-dn .inc-dn-c span{display:none}
 .inc-m-colgrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -4877,7 +4887,7 @@ body.c38-has-footer #content{padding-bottom:84px}
 .tbl-table td .tbl-cellrow>.tbl-select.sm{width:150px;flex:none}
 .tbl-next{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tbl-next.late{color:#b3303a}
-.tbl-dash{color:#7a8895}
+.tbl-dash{color:#66747f}
 .tbl-i{flex:none;display:inline-grid;place-items:center;width:24px;height:24px;border:0;border-radius:50%;background:none;color:#5d7183;cursor:pointer}
 .tbl-i:hover,.tbl-i[aria-expanded="true"]{background:#eaf1f8;color:#1A4F85}
 .tbl-more:focus-visible,.tbl-i:focus-visible,.tbl-adv:focus-visible,.tbl-textlink:focus-visible{outline:2px solid #1c75a2;outline-offset:2px}
@@ -4930,24 +4940,29 @@ body.c38-has-footer #content{padding-bottom:84px}
 .rp-ki strong,.rp-ki b,.rp-sev{max-width:100%;font-size:13px;font-weight:600;line-height:20px;color:#1b2f42}
 .rp-ki strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rp-sev{display:inline-flex;align-items:center;gap:6px}
-.rp-steps{display:flex;align-items:flex-start;margin:16px 0 0;padding:18px 0 4px;border-top:1px solid #e3e9ee;list-style:none}
-.rp-step{position:relative;flex:1 1 0;display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;padding-right:14px;text-align:left}
-.rp-step:last-child{flex:none;align-items:flex-end;min-width:92px;padding-right:0;text-align:right}
-.rp-step::after{content:"";position:absolute;top:7px;left:26px;right:10px;height:2px;background:#d5dee6}
-.rp-step:last-child::after{display:none}
-.rp-step.st-done::after{background:#1A4F85}
-.rp-step.st-notreq::after,.rp-step.st-na::after,.rp-step.st-rejected::after{height:0;background:none;border-top:2px dashed #d5dee6}
-.rp-dot{position:relative;z-index:1;width:16px;height:16px;box-sizing:border-box;border-radius:50%;background:#fff;border:2px solid #c3cfda}
-.rp-step.st-done .rp-dot{background:#1A4F85;border-color:#1A4F85}
-.rp-step.st-current .rp-dot{border-color:#1A4F85;box-shadow:0 0 0 3px #dbe8f4}
-.rp-step.st-rejected .rp-dot{border-color:#b3303a;box-shadow:0 0 0 3px #f6dcdc}
-.rp-step.st-notreq .rp-dot,.rp-step.st-na .rp-dot{border-style:dashed}
-.rp-lab{display:block;font-size:13px;line-height:18px;color:#44566a}
-.rp-step.st-current .rp-lab{font-weight:600;color:#143f6b}
+.rp-tl{margin-top:14px;padding-top:14px;border-top:1px solid #e3e9ee}
+.rp-sum{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:4px 20px}
+.rp-sum-l{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 8px;min-width:0}
+.rp-sum-st{font-size:15px;font-weight:600;line-height:22px;color:#1b2f42}
+.rp-sum-st.bad{color:#b3303a}
+.rp-sum-meta{font-size:13px;line-height:22px;color:#66747f}
+.rp-sum-r{display:flex;align-items:baseline;gap:0 4px;min-width:0;font-size:13px;line-height:22px;color:#44566a;text-align:right}
+.rp-sum-r strong{font-weight:600;color:#1f2d3c}
+.rp-late{display:inline-flex;align-items:center;gap:4px;color:#b3303a;font-weight:600}
+.rp-late svg{flex:none;align-self:center}
+.rp-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));column-gap:8px;margin:14px 0 0;padding:0;border:0;list-style:none}
+.rp-step{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;text-align:left}
+.rp-seg{display:block;width:100%;height:6px;border-radius:3px;background:#d5dee6;box-sizing:border-box}
+.rp-step.st-done .rp-seg{background:#1A4F85}
+.rp-step.st-current .rp-seg{background:#1A4F85;box-shadow:0 0 0 3px #dbe8f4}
+.rp-step.st-rejected .rp-seg{background:#b3303a;box-shadow:0 0 0 3px #f6dcdc}
+.rp-step.st-notreq .rp-seg,.rp-step.st-na .rp-seg{background:none;border:1px dashed #b9c7d3}
+.rp-lab{display:block;margin-top:4px;font-size:13px;line-height:18px;color:#66747f}
+.rp-step.st-done .rp-lab{color:#1f2d3c;font-weight:500}
+.rp-step.st-current .rp-lab{color:#143f6b;font-weight:600}
 .rp-step.st-rejected .rp-lab{color:#b3303a}
-.rp-step.st-notreq .rp-lab,.rp-step.st-na .rp-lab{color:#8795a1}
+.rp-step.st-notreq .rp-lab,.rp-step.st-na .rp-lab{color:#66747f}
 .rp-date{display:block;min-height:16px;font-size:12px;line-height:16px;color:#66747f}
-.rp-step.st-notreq .rp-date{font-style:italic}
 .rp-group{margin-top:12px;padding-top:12px;border-top:1px solid #edf1f4}
 .rp-group:first-child{margin-top:0;padding-top:10px;border-top:0}
 .rp-group>h4{margin:0 0 8px;font-size:12px;font-weight:600;color:#2b4153}
@@ -4956,7 +4971,16 @@ body.c38-has-footer #content{padding-bottom:84px}
 .rp-group .rp-sec{margin:0 0 10px}
 .rp-group .rp-sec:last-child{margin-bottom:0}
 .rp-sec h5{margin:0 0 3px;font-size:11px;font-weight:500;color:#66747f}
-.rp-none{color:#8795a1!important}
+.rp-none{color:#66747f!important}
+
+/* Confirmation dialog, demo note, empty-state action */
+.inc-ask-shade{position:fixed;inset:0;z-index:2300;background:rgba(15,36,56,.45)}
+.inc-ask{position:fixed;z-index:2310;top:50%;left:50%;transform:translate(-50%,-50%);width:min(420px,calc(100vw - 32px));box-sizing:border-box;padding:20px 24px;background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(15,36,56,.28)}
+.inc-ask h2{margin:0 0 8px;font-size:17px;font-weight:600;line-height:1.3;color:#1b2f42}
+.inc-ask p{margin:0;font-size:13px;line-height:1.5;color:#44566a}
+.inc-ask-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.mvp-demo{margin-right:14px;font-size:12px;color:#44566a;white-space:nowrap}
+.tbl-empty-act{height:auto;margin-left:6px;padding:0 4px}
 
 /* Review panel header controls and compact dialogs */
 .vr14-drawerbar .rp-barctl{display:flex;align-items:center;gap:14px;margin-left:auto;margin-right:12px}
@@ -4983,7 +5007,7 @@ body.c38-has-footer #content{padding-bottom:84px}
 
 /* All right-hand panels share one background */
 .rp-drawer,.rp-drawerbody,.vr14-drawer,.vr14-drawerbody,.dialog:not(.center),.dialog:not(.center) .dialogbody{background:#FAFAFA!important}
-@media(max-width:700px){.rp-key,.rp-facts4{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-lab{min-height:32px}}
+@media(max-width:700px){.rp-key,.rp-facts4{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-step{position:relative}.rp-step .rp-lab,.rp-step .rp-date{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.rp-step.st-current .rp-lab,.rp-step.st-current .rp-date,.rp-step.st-current+.rp-step .rp-lab{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:normal}}
 .rp-acc{background:#fff;border:1px solid #d5dee6;border-radius:8px;overflow:hidden}
 .rp-acc h3{margin:0}
 .rp-acc-head{display:flex;align-items:center}
@@ -5058,11 +5082,11 @@ body.c38-has-footer #content{padding-bottom:84px}
 .v32-pad{position:relative;margin:6px 0 8px;height:124px;border:1px solid #c4d1dd;border-radius:4px;background:#fbfcfd}
 .v32-pad canvas{display:block;width:100%;height:100%;border-radius:4px;touch-action:none;cursor:crosshair}
 .v32-pad-line{position:absolute;left:14px;right:14px;bottom:28px;border-top:1px dashed #c9d4dd;pointer-events:none}
-.v32-pad-hint{position:absolute;left:14px;bottom:8px;font-size:12px;color:#8a98a5;pointer-events:none}
+.v32-pad-hint{position:absolute;left:14px;bottom:8px;font-size:12px;color:#66747f;pointer-events:none}
 .v32-pad:focus-within,.v32-pad.drawing{border-color:#1A4F85;box-shadow:0 0 0 2px #d9e6f2}
 .inc-sig{margin-top:12px;padding-top:12px;border-top:1px solid #e7edf2}
 .inc-sig img{display:block;width:210px;max-width:100%;height:auto;background:#fbfcfd;border:1px solid #dde5ec;border-radius:4px}
-.inc-sig small{display:block;margin-top:6px;font-size:12px;color:#64798a}
+.inc-sig small{display:block;margin-top:6px;font-size:12px;color:#5d7183}
 </style>
 <script data-bundled-from="status-widgets-v40.js">
 /* Summary cards for My Reports and My Reviews. All counts come from the same status model as the tables. */
@@ -5091,10 +5115,12 @@ body.c38-has-footer #content{padding-bottom:84px}
  /* One fixed-size card: title top-left, up to six clickable filters in a 3 x 2 grid, donut on the right. */
  const colBtn=(field,x,on)=>`<button type="button" class="inc-mcol${x.id==='yes'&&x.n?' hot':''}${x.n?'':' zero'}" data-inc-f="${field}" data-inc-v="${esc(x.id)}" aria-pressed="${on?'true':'false'}" title="${esc(x.full||x.label)}: ${x.n}"><strong>${x.n}</strong><span>${esc(x.label)}</span></button>`;
  function miniCard({cls,title,field,total,items,current,meta,head,warn,cols}){
-  const top=`<div class="inc-m-head"><h3 title="${esc(title)}">${esc(title)}</h3>${meta?`<span class="inc-m-meta">${esc(meta)}</span>`:''}${head||''}</div>`;
+  const top=`<div class="inc-m-head"><h3 title="${esc(title)}">${esc(title)}</h3>${meta?`<span class="inc-m-meta">${esc(meta)}</span>`:''}</div>`;
+  const corner=head?`<div class="inc-m-corner">${head}</div>`:'';
+  const sw=head?' inc-m-sw':'';
   const label=`Filter the table: ${esc(title)}`;
-  if(cols)return `<section class="inc-m ${cls} inc-m-cols" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-colgrid" role="group" aria-label="${label}">${items.map(x=>colBtn(field,x,current===x.id)).join('')}</div></div></section>`;
-  return `<section class="inc-m ${cls}" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-grid" role="group" aria-label="${label}">${items.map(x=>cell(field,x,current===x.id)).join('')}</div></div><div class="inc-m-dn">${donut(items,total,'',warn)}</div></section>`;
+  if(cols)return `<section class="inc-m ${cls} inc-m-cols${sw}" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-colgrid" role="group" aria-label="${label}">${items.map(x=>colBtn(field,x,current===x.id)).join('')}</div></div>${corner}</section>`;
+  return `<section class="inc-m ${cls}${sw}" aria-label="${esc(title)}"><div class="inc-m-main">${top}<div class="inc-m-grid" role="group" aria-label="${label}">${items.map(x=>cell(field,x,current===x.id)).join('')}</div></div><div class="inc-m-dn">${donut(items,total,'',warn)}</div>${corner}</section>`;
  }
  const idsFromLevels=(items,lv)=>items.map((x,i)=>({...x,id:i<lv.length?lv[i].id:'none'}));
  const URG_IDS=['yes','no','unknown'];
@@ -5153,7 +5179,7 @@ body.c38-has-footer #content{padding-bottom:84px}
  document.addEventListener('click',e=>{
   const b=e.target.closest('[data-inc-wmode]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();
   wmode=b.dataset.incWmode;const g=b.closest('.inc-widgets');if(!g)return;
-  g.outerHTML=incWidgets('reviews');document.querySelector(`[data-inc-kind=reviews] [data-inc-wmode="${wmode}"]`)?.focus();
+  g.outerHTML=incWidgets('reviews');if(e.detail===0)document.querySelector(`[data-inc-kind=reviews] [data-inc-wmode="${wmode}"]`)?.focus();
  },true);
  window.incSigData=function(c){const t=document.createElement('canvas');t.width=Math.round(c.width/2);t.height=Math.round(c.height/2);const g=t.getContext('2d');g.drawImage(c,0,0,t.width,t.height);return t.toDataURL('image/png')};
  /* Signature pad: draw with mouse, finger or stylus. Signing is the confirmation. */
@@ -5202,25 +5228,25 @@ body.c38-has-footer #content{padding-bottom:84px}
 </script>
 <style data-bundled-from="panel-sections-v42.css">
 /* Review cards, follow-up actions and external review inside the incident panel. */
-.inc-sec-note{margin:0 0 10px;font-size:12.5px;color:#64798a}
+.inc-sec-note{margin:0 0 10px;font-size:12.5px;color:#5d7183}
 .inc-rv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .inc-rv-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:14px;background:#fff;border:1px solid #d5dee6;border-radius:4px}
 .inc-rv-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .inc-rv-head h3{margin:0;font-size:13px;font-weight:600;color:#2b4153}
 .inc-rv-sig{display:grid;place-items:center;height:96px;background:#fbfcfd;border:1px solid #e1e8ee;border-radius:4px;overflow:hidden}
 .inc-rv-sig img{display:block;max-width:100%;max-height:100%;object-fit:contain}
-.inc-rv-sig span{padding:0 12px;text-align:center;font-size:12.5px;color:#7d8c99}
+.inc-rv-sig span{padding:0 12px;text-align:center;font-size:12.5px;color:#66747f}
 .inc-rv-who{display:flex;flex-direction:column;gap:2px}
 .inc-rv-who strong{font-size:13px;font-weight:600;color:#1f2d3c}
-.inc-rv-who small{font-size:12px;color:#64798a}
-.inc-rv-card.empty .inc-rv-head h3{color:#64798a}
+.inc-rv-who small{font-size:12px;color:#5d7183}
+.inc-rv-card.empty .inc-rv-head h3{color:#5d7183}
 .inc-act-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 6px}
 .inc-act-sum{margin:0;font-size:12.5px;color:#44566a}
 .inc-act-list{border-top:1px solid #e7edf2}
 .inc-act-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px 16px;padding:12px 0;border-bottom:1px solid #e7edf2}
 .inc-act-main{min-width:0}
 .inc-act-main strong{display:block;font-size:13px;font-weight:600;color:#1f2d3c;line-height:1.35}
-.inc-act-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:4px;font-size:12px;color:#64798a}
+.inc-act-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:4px;font-size:12px;color:#5d7183}
 .inc-tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:9px;background:#eaf1f8;color:#1A4F85;font-size:11px;font-weight:600}
 .inc-tag.ghost{background:#f1f4f7;color:#566574}
 .inc-act-state{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
@@ -5242,7 +5268,7 @@ body.c38-has-footer #content{padding-bottom:84px}
 .inc-note-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 .inc-note{padding:12px 0;border-top:1px solid #e7edf2}
 .inc-note:first-of-type{border-top:0}
-.inc-note small{display:block;margin-top:6px;font-size:12px;color:#64798a}
+.inc-note small{display:block;margin-top:6px;font-size:12px;color:#5d7183}
 .inc-ext-text{margin:0;font-size:13px;line-height:1.5;color:#1f2d3c;white-space:pre-wrap;overflow-wrap:anywhere}
 /* Patients: incident history as a table, with the read-only panel above it */
 .dialog.c39-history{width:min(800px,100vw)!important}
@@ -5408,38 +5434,51 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
  /* When each status was reached. Read from the history first, then from the report's own dates. */
  function rpDates(r){
   const v=r.mvpReview||{},log=r.timeline||[];
-  const last=re=>{for(let i=log.length-1;i>=0;i--)if(re.test(String(log[i].text||'')))return log[i].at;return null};
+  const who=t=>{const m=/ by (.+?)\.?$/.exec(String(t||''));return m?m[1].replace(/\s+with .*$/,''):null};
+  const last=re=>{for(let i=log.length-1;i>=0;i--)if(re.test(String(log[i].text||'')))return {at:log[i].at,by:who(log[i].text)};return null};
+  const o=(at,by)=>at?{at,by:by||null}:null;
   return {
-   'Reported':r.submittedAt,
-   'In Review':last(/^(?:Review (?:claimed|accepted) by|Report moved back to In Review by)/i)||r.acceptedAt||v.claimedAt||null,
-   'Follow up pending':last(/^(?:Report )?(?:approved|acknowledged) by|^Status changed to Follow up pending by/i)||r.reviewCompletedAt||v.decidedAt||v.signedAt||null,
+   'Reported':o(r.submittedAt,r.reporterName),
+   'In Review':last(/^(?:Review (?:claimed|accepted) by|Report moved back to In Review by)/i)||o(r.acceptedAt||v.claimedAt,v.owner),
+   'Follow up pending':last(/^(?:Report )?(?:approved|acknowledged) by|^Status changed to Follow up pending by/i)||o(r.reviewCompletedAt||v.decidedAt||v.signedAt,v.signedBy||v.owner),
    'Follow up completed':last(/^Status changed to Follow up completed by/i),
    'Closed':last(/^Status changed to Closed by/i),
-   'Rejected':last(/^(?:Report )?rejected by/i)||v.decidedAt||null
+   'Rejected':last(/^(?:Report )?rejected by/i)||o(v.decidedAt,v.owner)
   };
  }
  /* The timeline always has the same five slots in the same places, so every incident reads the same way.
     Follow-up slots are muted as "Not required" when a report has no follow-up actions.
     A rejected report shows Rejected in the second slot and the rest muted. */
- function rpSlots(r){
-  const s=status(r),rejected=s==='Rejected',inFollow=s==='Follow up pending'||s==='Follow up completed';
-  const hasFollow=((r.mvpActions||[]).length||(vr12Step(r).actions||[]).length)>0||inFollow,cur=RP_STEPS.indexOf(s);
-  return RP_STEPS.map((k,i)=>{
-   if(rejected)return i===0?{k,state:'done'}:i===1?{k:'Rejected',state:'current',rejected:true}:{k,state:'na'};
-   if((k==='Follow up pending'||k==='Follow up completed')&&!hasFollow)return {k,state:'notreq'};
-   return {k,state:i<cur?'done':i===cur?'current':'todo'};
+ function rpSegments(r){
+  const s=status(r),inFollow=s==='Follow up pending'||s==='Follow up completed',cur=RP_STEPS.indexOf(s);
+  const hasFollow=((r.mvpActions||[]).length||(vr12Step(r).actions||[]).length)>0||inFollow;
+  if(s==='Rejected')return [{k:'Reported',state:'done',span:1},{k:'Rejected',state:'current',rejected:true,span:1},{k:'Not applicable',state:'na',span:3}];
+  const seg=[];
+  RP_STEPS.forEach((k,i)=>{
+   if((k==='Follow up pending'||k==='Follow up completed')&&!hasFollow){if(k==='Follow up pending')seg.push({k:'Follow up not required',state:'notreq',span:2});return}
+   seg.push({k,state:i<cur?'done':i===cur?'current':'todo',span:1});
   });
+  return seg;
  }
+ const rpDur=ms=>{const m=Math.max(0,Math.round(ms/60000)),d=Math.floor(m/1440),h=Math.floor((m%1440)/60),mm=m%60;return d?`${d} d${h?' '+h+' h':''}`:h?`${h} h${mm?' '+mm+' min':''}`:`${mm} min`};
  function rpBanner(r){
-  const f=r.form,dates=rpDates(r);
+  const f=r.form,s=status(r),dates=rpDates(r),segs=rpSegments(r),v=r.mvpReview||{};
   const type=(typeof rHasHidden==='function'&&rHasHidden(r))?'Incident details restricted':rShortClass(f);
   const urg=({yes:'Urgent',no:'Not urgent',unknown:'Not sure'})[f.urgency]||'Not sure';
   const words={done:'completed',current:'current step',todo:'upcoming',notreq:'not required',na:'not applicable'};
-  const items=rpSlots(r).map(x=>{
-   const d=(x.state==='done'||x.state==='current')&&dates[x.k]?rFmt(dates[x.k]):x.state==='notreq'?'Not required':'';
-   return `<li class="rp-step st-${x.state}${x.rejected?' st-rejected':''}"${x.state==='current'?' aria-current="step"':''}><span class="rp-dot" aria-hidden="true"></span><span class="rp-lab">${esc(x.k)}<span class="sr-only"> (${words[x.state]})</span></span><small class="rp-date">${d?esc(d):'&nbsp;'}</small></li>`;
+  const terminal=s==='Closed'||s==='Rejected',rejected=s==='Rejected',nowMs=new Date(rNow()).getTime();
+  const info=typeof window.incStatusInfo==='function'?window.incStatusInfo(r)||{}:{},nx=typeof window.incNextInfo==='function'?window.incNextInfo(r):null;
+  const since=(dates[s]&&dates[s].at)||info.at,dur=!terminal&&since?rpDur(nowMs-new Date(since).getTime()):'';
+  const meta=terminal?[info.at?rFmt(info.at)+(info.by?' by '+info.by:''):''].filter(Boolean):[nx&&nx.who?'with '+nx.who:'',dur?dur+' in this stage':''].filter(Boolean);
+  let right='';
+  if(terminal){right=rejected?(v.reason?'Reason: '+esc(v.reason):''):(segs.some(x=>x.state==='notreq')?'Follow-up was not required':'')}
+  else if(nx&&nx.key!=='none'){const late=nx.due&&new Date(nx.due).getTime()<nowMs;right='Next: <strong>'+esc(nx.label)+'</strong>'+(nx.due?' · '+(late?`<span class="rp-late">${icon('clock',13)}overdue since ${esc(rFmt(nx.due))}</span>`:'due '+esc(rFmt(nx.due))):'')}
+  const items=segs.map(x=>{
+   const st=dates[x.k],reached=x.state==='done'||x.state==='current',d=reached&&st&&st.at?rFmt(st.at):'';
+   const tip=d?`${x.k} · ${d}${st.by?' · '+st.by:''}`:'';
+   return `<li class="rp-step st-${x.state}${x.rejected?' st-rejected':''}" style="grid-column:span ${x.span}"${x.state==='current'?' aria-current="step"':''}${tip?` title="${esc(tip)}"`:''}><span class="rp-seg" aria-hidden="true"></span><span class="rp-lab">${esc(x.k)}<span class="sr-only"> (${words[x.state]})</span></span><small class="rp-date">${d?esc(d):'&nbsp;'}</small></li>`;
   }).join('');
-  return `<section class="rp-banner" aria-label="Incident summary"><div class="rp-key"><div class="rp-ki"><small>Incident type</small><strong title="${esc(type)}">${esc(type)}</strong></div><div class="rp-ki"><small>Severity</small>${rpSev(f.severity)}</div><div class="rp-ki"><small>Urgency</small><b>${esc(urg)}</b></div><div class="rp-ki"><small>Date and time</small><b>${esc(window.rpWhen(f))}</b></div></div><ol class="rp-steps" aria-label="Report progress">${items}</ol></section>`;
+  return `<section class="rp-banner" aria-label="Incident summary"><div class="rp-key"><div class="rp-ki"><small>Incident type</small><strong title="${esc(type)}">${esc(type)}</strong></div><div class="rp-ki"><small>Severity</small>${rpSev(f.severity)}</div><div class="rp-ki"><small>Urgency</small><b>${esc(urg)}</b></div><div class="rp-ki"><small>Date and time</small><b>${esc(window.rpWhen(f))}</b></div></div><div class="rp-tl"><div class="rp-sum"><div class="rp-sum-l"><strong class="rp-sum-st${rejected?' bad':''}">${esc(s)}</strong>${meta.length?`<span class="rp-sum-meta">· ${esc(meta.join(' · '))}</span>`:''}</div>${right?`<div class="rp-sum-r">${right}</div>`:''}</div><ol class="rp-steps" aria-label="Report progress">${items}</ol></div></section>`;
  }
  const rpAcc=(id,key,title,summary,body,o={})=>{
   const open=Boolean(rpAccOpen[id]&&rpAccOpen[id][key]);
@@ -5576,6 +5615,41 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
   if(ed){e.preventDefault();e.stopImmediatePropagation();if(!ed.disabled)openEdit(find(ed.dataset.rvEdit));return}
   if(m){e.preventDefault();e.stopImmediatePropagation();const a=m.dataset.rvModal;if(a==='cancel'){rvFor=null;closeModal(true)}else if(a==='reassign')confirmReassign();else if(a==='save-edit')saveEdit();return}
  },true);
+
+ /* ---- confirmation dialog in the product's own style (replaces the browser's confirm in the common flows) ---- */
+ (function(){
+  const COPY=[
+   [/^Discard this report\?|^Discard unsaved form changes\?/,{t:'Discard this report?',b:'Your changes aren’t saved. Save a draft first to keep them.',y:'Discard report',n:'Keep editing',d:1}],
+   [/^Leave the report without saving\?|^Leave without saving/,{t:'Leave without saving?',b:'Your changes aren’t saved.',y:'Leave',n:'Stay',d:1}],
+   [/^Discard (?:unapplied )?changes|^Discard the unsaved|^Discard unsaved review/,{t:'Discard changes?',b:'Your changes haven’t been applied.',y:'Discard',n:'Keep editing',d:1}],
+   [/^Remove this combination/,{t:'Remove this combination?',b:'Existing cases aren’t connected to this draft.',y:'Remove',n:'Cancel',d:1}],
+   [/^Remove the second review/,{t:'Remove the second review?',b:'It will be removed from this combination.',y:'Remove',n:'Cancel',d:1}],
+   [/^Remove this follow-up action/,{t:'Remove this action?',b:'It will be removed from this draft.',y:'Remove',n:'Cancel',d:1}],
+   [/^Disable this workflow/,{t:'Disable this workflow?',b:'Existing reports are not changed.',y:'Disable',n:'Cancel',d:1}],
+   [/^Reset (?:the prototype|this v0\.5|fictional)/,{t:'Reset the prototype?',b:'This clears changed reports, review decisions, drafts and configuration saved in this browser. This can’t be undone.',y:'Reset',n:'Cancel',d:1}],
+   [/^Replace the working draft/,{t:'Restore this version?',b:'The active version won’t change.',y:'Restore',n:'Cancel'}],
+   [/^No affected person added/,{t:'Submit without an affected person?',b:'To record that nobody was affected, go back and choose No person affected.',y:'Submit anyway',n:'Go back'}],
+   [/^Return this report to Reported/,{t:'Return to Reported?',b:'This removes the review assignment and any decision.',y:'Return report',n:'Cancel',d:1}],
+   [/^Move this report back to (.+)\?$/,{t:'Move back to $1?',b:'',y:'Move back',n:'Cancel'}]
+  ];
+  let host=null,done=null,opener=null;
+  const copy=o=>{const msg=String(o.msg||'');for(const [re,c] of COPY){const m=re.exec(msg);if(m)return {...c,t:c.t.replace('$1',m[1]||'')}}const i=msg.search(/[.?!]\s/);return {t:i>0?msg.slice(0,i+1):msg,b:i>0?msg.slice(i+1).trim():'',y:'Confirm',n:'Cancel'}};
+  function close(ok){if(!host)return;host.remove();host=null;const r=done;done=null;if(opener&&opener.isConnected)opener.focus({preventScroll:true});if(r)r(ok)}
+  window.incAsk=function(o){return new Promise(res=>{
+   if(host)close(false);const c=copy(o);opener=document.activeElement;done=res;
+   host=document.createElement('div');host.className='inc-ask-root';
+   host.innerHTML=`<div class="inc-ask-shade" data-ask="no"></div><div class="inc-ask" role="alertdialog" aria-modal="true" aria-labelledby="inc-ask-t"${c.b?' aria-describedby="inc-ask-b"':''}><h2 id="inc-ask-t">${esc(c.t)}</h2>${c.b?`<p id="inc-ask-b">${esc(c.b)}</p>`:''}<div class="inc-ask-foot"><button type="button" class="btn" data-ask="no">${esc(c.n)}</button><button type="button" class="btn ${c.d?'danger':'primary'}" data-ask="yes">${esc(c.y)}</button></div></div>`;
+   document.body.appendChild(host);host.querySelector('button[data-ask="no"]').focus();
+  })};
+  window.__incOk=false;
+  window.incGuard=function(o,run){if(window.__incOk)return false;window.incAsk(o).then(ok=>{if(!ok)return;window.__incOk=true;try{run()}finally{window.__incOk=false}});return true};
+  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-ask]');if(!b||!host||!host.contains(b))return;e.preventDefault();e.stopPropagation();close(b.dataset.ask==='yes')},true);
+  window.addEventListener('keydown',e=>{
+   if(!host)return;
+   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(false);return}
+   if(e.key==='Tab'){const b=[...host.querySelectorAll('button')];const i=b.indexOf(document.activeElement);e.preventDefault();b[(i+(e.shiftKey?-1:1)+b.length)%b.length].focus()}
+  },true);
+ })();
  window.incReviewerPanel=function(r){
   try{
    const key='rev:'+r.id,st=rpAccOpen[key]||(rpAccOpen[key]={actions:true,notes:true});
@@ -5720,7 +5794,7 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
 .inc-fsec-head h3{margin:0;font-size:14px;font-weight:600}
 .inc-fsec-head .inc-chev{flex:none;transition:transform .15s ease}
 .inc-fsec-head[aria-expanded="false"] .inc-chev{transform:rotate(-90deg)}
-.inc-fsec-meta{margin-left:auto;font-size:12px;color:#64798a}
+.inc-fsec-meta{margin-left:auto;font-size:12px;color:#5d7183}
 .inc-fsec-meta.warn{color:#b3303a;font-weight:600}
 .inc-fsec-body{padding:18px}
 .inc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 28px;align-items:start}
@@ -5729,7 +5803,7 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
 .inc-ff{display:flex;flex-direction:column;gap:6px;min-width:0}
 .inc-ff>label,.inc-ff>.inc-lab{margin:0;font-size:13px;font-weight:600;line-height:18px;color:#2b4153}
 .inc-req{color:#c0392b;font-weight:700;margin-left:2px}
-.inc-help{margin:0;min-height:16px;font-size:12px;line-height:16px;font-weight:400;color:#64798a}
+.inc-help{margin:0;min-height:16px;font-size:12px;line-height:16px;font-weight:400;color:#5d7183}
 .inc-ferr{margin:2px 0 0;font-size:12px;color:#b3303a}
 .inc-none{margin:0 0 16px;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
 .inc-form input[type=datetime-local],.inc-form .r-classbutton,.inc-form .r-severityrow select{height:40px;box-sizing:border-box}
@@ -5752,13 +5826,13 @@ body:has(#modal-root .backdrop:not(.center)) .ip-overlay.ip-over .vr14-drawer{vi
 .inc-form .r-person-combobox .r-chip button{flex:none}
 .inc-more{flex:none;height:26px;padding:0 8px;border:0;border-radius:13px;background:#d9e6f2;color:#1A4F85;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .inc-form .r-person-combobox input{flex:1 1 70px;min-width:70px;height:32px!important;border:0!important;box-shadow:none!important;outline:0!important;background:transparent!important;padding:0 4px!important}
-.inc-form .r-person-combobox.is-disabled,.inc-form .is-disabled input{background:#f4f6f8!important;color:#8a98a5;cursor:not-allowed}
+.inc-form .r-person-combobox.is-disabled,.inc-form .is-disabled input{background:#f4f6f8!important;color:#66747f;cursor:not-allowed}
 .inc-result{display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:9px 12px;background:#fff;border:0;border-bottom:1px solid #edf1f4;font:inherit;font-size:13px;text-align:left;cursor:pointer}
 .inc-result:last-child{border-bottom:0}
 .inc-result:hover,.inc-result:focus-visible{background:#f3f8fc;outline:0}
 .inc-result.is-on{background:#f3f8fc}
 .inc-result strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.inc-result .mono{flex:none;color:#64798a}
+.inc-result .mono{flex:none;color:#5d7183}
 .inc-tick{flex:none;width:14px;height:14px;color:#1A4F85}
 @media(max-width:900px){.inc-grid,.inc-triple{grid-template-columns:minmax(0,1fr)}}
 </style>
@@ -5903,7 +5977,7 @@ ${sec('other','Other details',otherN?`${otherN} filled`:'None added',other)}
    return;
   }
   rUI.fieldErrors={};syncAffected(f);
-  if(!f.affectedNone&&!f.affectedUnknown&&!any(f,'affected')&&!f.noAffectedConfirmed){if(!confirm('No affected person added. Submit anyway? To record that nobody was affected, cancel and choose “No person affected”.'))return;f.noAffectedConfirmed=true}
+  if(!f.affectedNone&&!f.affectedUnknown&&!any(f,'affected')&&!f.noAffectedConfirmed){incAsk({msg:'No affected person added. Submit anyway?'}).then(ok=>{if(ok){f.noAffectedConfirmed=true;rReviewReport()}});return}
   f.affectedStash=null;f.involvedStash=null;
   const other=rValidation(f);if(other.length){toast(other[0],true);return}
   rSubmit();
