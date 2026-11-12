@@ -801,6 +801,8 @@ const PATIENTS=[
 ];
 const EMPLOYEES=[REPORTER,{id:'EMP-1058',name:'Morgan Davis'},{id:'EMP-1062',name:'Alex Kim'},{id:'EMP-1081',name:'Dana Ortiz'},{id:'EMP-1103',name:'Chris Bennett'}];
 const RPROGRAMS=['Residential care','Residential care / Stabilization','Outpatient / Follow-up'];
+/* Patients are shown with a four-digit PID starting at 1000. The internal key stays as it is. */
+const rPid=id=>{const i=PATIENTS.findIndex(p=>p.id===id);return i<0?String(id):String(1000+i)};
 function followDefaults(){return {acceptanceSla:'SLA-ACCEPT'}}
 function ensureV05(c){if(!c.workflow.reporterFollowup)c.workflow.reporterFollowup=followDefaults();const extra=[
 {id:'SLA-ACCEPT',name:'Initial-review acceptance',measure:'acceptance',start:'submission',target:30,unit:'minutes',calendar:'continuous',warning:10,escalation:'facility:safety',warningNotification:'N-WARN',overdueNotification:'N-OVERDUE'},
@@ -2166,7 +2168,7 @@ body[data-ws="admin"] #band{display:none!important}
     const q=(rUI.search||'').toLowerCase();people=people.filter(p=>(p.name+' '+p.id+' '+(p.room||'')).toLowerCase().includes(q));
     const pages=Math.max(1,Math.ceil(people.length/U.patientSize));U.patientPage=Math.min(U.patientPage,pages);
     const start=(U.patientPage-1)*U.patientSize,shown=people.slice(start,start+U.patientSize);
-    return `<section class="unified-patients"><div class="unified-patient-tools"><div class="search">${icon('search',16)}<input type="search" id="r-search" data-r-search="patients" placeholder="Search patients by name or ID" value="${esc(rUI.search||'')}"></div><select id="r-patient-filter" aria-label="Patient scope">${[['both','All relevant patients'],['residents','Current residents'],['appointments',"Today’s appointments"]].map(([v,n])=>`<option value="${v}" ${rUI.patientFilter===v?'selected':''}>${n}</option>`).join('')}</select></div><div class="tablewrap"><table class="unified-patient-table"><thead><tr><th>Patient ID</th><th>Patient name</th><th>Location</th><th>Total incidents</th><th>Last incident</th><th>Latest severity</th><th>Actions</th></tr></thead><tbody>${shown.map(p=>{const history=rState.reports.filter(r=>r.historyVisible&&incHasPatient(r,p.id)&&rSite(r.location)).sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));const latest=history[0];return `<tr><td>${esc(p.id)}</td><td><div class="unified-patient-name">${esc(p.name)}</div></td><td>${esc(p.room||'—')}</td><td>${history.length}</td><td>${latest?esc(rFmt(latest.submittedAt)):'—'}</td><td>${latest?esc(levelName(latest.form.severity)||'Unassessed'):'—'}</td><td><div class="actions">${rB('History','patient-history','small',`data-id="${p.id}"`)}${rB('Report incident','patient-report','small',`data-id="${p.id}"`)}</div></td></tr>`}).join('')||'<tr><td colspan="7">No matching patients</td></tr>'}</tbody></table></div><footer class="unified-patient-footer"><span>${people.length?start+1:0}–${Math.min(start+U.patientSize,people.length)} of ${people.length}</span><div class="actions"><button class="btn small" data-unified="page" data-dir="-1" ${U.patientPage===1?'disabled':''}>Previous</button><span>Page ${U.patientPage} of ${pages}</span><button class="btn small" data-unified="page" data-dir="1" ${U.patientPage>=pages?'disabled':''}>Next</button></div></footer></section>`;
+    return `<section class="unified-patients"><div class="unified-patient-tools"><div class="search">${icon('search',16)}<input type="search" id="r-search" data-r-search="patients" placeholder="Search patients by name or ID" value="${esc(rUI.search||'')}"></div><select id="r-patient-filter" aria-label="Patient scope">${[['both','All relevant patients'],['residents','Current residents'],['appointments',"Today’s appointments"]].map(([v,n])=>`<option value="${v}" ${rUI.patientFilter===v?'selected':''}>${n}</option>`).join('')}</select></div><div class="tablewrap"><table class="unified-patient-table"><thead><tr><th>Patient ID</th><th>Patient name</th><th>Location</th><th>Total incidents</th><th>Last incident</th><th>Latest severity</th><th>Actions</th></tr></thead><tbody>${shown.map(p=>{const history=rState.reports.filter(r=>r.historyVisible&&incHasPatient(r,p.id)&&rSite(r.location)).sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));const latest=history[0];return `<tr><td>${esc(rPid(p.id))}</td><td><div class="unified-patient-name">${esc(p.name)}</div></td><td>${esc(p.room||'—')}</td><td>${history.length}</td><td>${latest?esc(rFmt(latest.submittedAt)):'—'}</td><td>${latest?esc(levelName(latest.form.severity)||'Unassessed'):'—'}</td><td><div class="actions">${rB('History','patient-history','small',`data-id="${p.id}"`)}${rB('Report incident','patient-report','small',`data-id="${p.id}"`)}</div></td></tr>`}).join('')||'<tr><td colspan="7">No matching patients</td></tr>'}</tbody></table></div><footer class="unified-patient-footer"><span>${people.length?start+1:0}–${Math.min(start+U.patientSize,people.length)} of ${people.length}</span><div class="actions"><button class="btn small" data-unified="page" data-dir="-1" ${U.patientPage===1?'disabled':''}>Previous</button><span>Page ${U.patientPage} of ${pages}</span><button class="btn small" data-unified="page" data-dir="1" ${U.patientPage>=pages?'disabled':''}>Next</button></div></footer></section>`;
   };
   // The existing report and reviewer engines continue to own their own forms, decisions and persistence.
   const origHome=rHome;
@@ -2287,7 +2289,7 @@ body[data-ws="admin"] #band{display:none!important}
   if(S.sort.patients==='id')people.sort((a,b)=>a.id.localeCompare(b.id));
   if(S.sort.patients==='incidents')people.sort((a,b)=>rState.reports.filter(r=>incHasPatient(r,b.id)).length-rState.reports.filter(r=>incHasPatient(r,a.id)).length);
   const total=people.length,size=S.patientSize,pages=Math.max(1,Math.ceil(total/size));S.patientPage=Math.min(Math.max(1,S.patientPage),pages);
-  const rows=people.slice((S.patientPage-1)*size,S.patientPage*size).map(p=>{const history=rState.reports.filter(r=>r.historyVisible&&rSite(r.location)&&incHasPatient(r,p.id)).sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));const latest=history[0];return `<tr tabindex="0" role="button" aria-label="View incident history for ${esc(p.name)}" data-r="patient-history" data-id="${esc(p.id)}"><td>${esc(p.id)}</td><td><strong>${esc(p.name)}</strong></td><td>${esc(p.room||'—')}</td><td>${history.length}</td><td>${latest?esc(rFmt(latest.submittedAt)):'—'}</td><td>${latest?esc(levelName(latest.form.severity)||'Unassessed'):'—'}</td><td class="u18-actions">${actionIcon('r','patient-history',p.id,'View incident history','history')}${actionIcon('r','patient-report',p.id,'Report incident','file-plus')}</td></tr>`});
+  const rows=people.slice((S.patientPage-1)*size,S.patientPage*size).map(p=>{const history=rState.reports.filter(r=>r.historyVisible&&rSite(r.location)&&incHasPatient(r,p.id)).sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));const latest=history[0];return `<tr tabindex="0" role="button" aria-label="View incident history for ${esc(p.name)}" data-r="patient-history" data-id="${esc(p.id)}"><td>${esc(rPid(p.id))}</td><td><strong>${esc(p.name)}</strong></td><td>${esc(p.room||'—')}</td><td>${history.length}</td><td>${latest?esc(rFmt(latest.submittedAt)):'—'}</td><td>${latest?esc(levelName(latest.form.severity)||'Unassessed'):'—'}</td><td class="u18-actions">${actionIcon('r','patient-history',p.id,'View incident history','history')}${actionIcon('r','patient-report',p.id,'Report incident','file-plus')}</td></tr>`});
   const filters=select('patient-scope',[['both','All relevant patients'],['residents','Current residents'],['appointments',"Today’s appointments"]],rUI.patientFilter,'Filter patients')+select('patients-sort',[['name','Patient name'],['id','Patient ID'],['incidents','Most incidents']],S.sort.patients,'Sort patients');
   return shell({kind:'patients',query:rUI.search,queryId:'r-search',filters,rows,headers:['Patient ID','Patient name','Location','Total incidents','Last incident','Latest severity','Actions'],page:S.patientPage,size,total});
  };
@@ -3937,28 +3939,28 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   {k:'actions',label:'Actions',w:158,align:'right'}
  ];
  const REVIEW_COLS=[
-  {k:'id',label:'ID',w:104,sort:true,first:'asc'},
-  {k:'type',label:'Incident type',w:150,sort:true,first:'asc'},
-  {k:'names',label:'Affected people',w:120},
+  {k:'id',label:'ID',w:84,sort:true,first:'asc'},
+  {k:'type',label:'Incident type',w:140,sort:true,first:'asc'},
+  {k:'names',label:'Affected people',w:110},
   {k:'severity',label:'Severity',w:112,sort:true,first:'desc'},
-  {k:'urgency',label:'Urgency',w:92,sort:true,first:'desc'},
-  {k:'by',label:'Submitted by',w:110,sort:true,first:'asc'},
-  {k:'status',label:'Status',w:160,sort:true,first:'asc'},
-  {k:'next',label:'Next requirement',w:160,sort:true,first:'asc'},
-  {k:'loc',label:'Location',w:130,sort:true,first:'asc'},
-  {k:'submitted',label:'Reported on',w:128,sort:true,first:'desc'},
-  {k:'actions',label:'Actions',w:100,align:'right'}
+  {k:'urgency',label:'Urgency',w:88,sort:true,first:'desc'},
+  {k:'by',label:'Submitted by',w:104,sort:true,first:'asc'},
+  {k:'status',label:'Status',w:162,sort:true,first:'asc'},
+  {k:'next',label:'Next requirement',w:185,sort:true,first:'asc'},
+  {k:'loc',label:'Location',w:163,sort:true,first:'asc'},
+  {k:'submitted',label:'Reported on',w:122,sort:true,first:'desc'},
+  {k:'actions',label:'Actions',w:96,align:'right'}
  ];
  const REPORT_COLS=[
-  {k:'id',label:'ID',w:104,sort:true,first:'asc'},
+  {k:'id',label:'ID',w:84,sort:true,first:'asc'},
   {k:'type',label:'Incident type',w:170,sort:true,first:'asc'},
   {k:'names',label:'Affected people',w:150},
   {k:'severity',label:'Severity',w:112,sort:true,first:'desc'},
-  {k:'urgency',label:'Urgency',w:92,sort:true,first:'desc'},
-  {k:'status',label:'Status',w:160,sort:true,first:'asc'},
-  {k:'next',label:'Next requirement',w:170,sort:true,first:'asc'},
-  {k:'loc',label:'Location',w:150,sort:true,first:'asc'},
-  {k:'submitted',label:'Reported on',w:128,sort:true,first:'desc'},
+  {k:'urgency',label:'Urgency',w:88,sort:true,first:'desc'},
+  {k:'status',label:'Status',w:150,sort:true,first:'asc'},
+  {k:'next',label:'Next requirement',w:185,sort:true,first:'asc'},
+  {k:'loc',label:'Location',w:175,sort:true,first:'asc'},
+  {k:'submitted',label:'Reported on',w:122,sort:true,first:'desc'},
   {k:'actions',label:'Actions',w:90,align:'right'}
  ];
  const incidentCols=kind=>kind==='reviews'?REVIEW_COLS:kind==='reports'?REPORT_COLS:incidentColsBase(kind);
@@ -4167,7 +4169,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
 
  /* ---------- patients ---------- */
  const patientCols=[
-  {k:'pid',label:'PID',w:100,sort:true,first:'asc'},
+  {k:'pid',label:'PID',w:84,sort:true,first:'asc'},
   {k:'name',label:'Patient name',w:180,sort:true,first:'asc'},
   {k:'age',label:'Age',w:80,sort:true,first:'asc'},
   {k:'loc',label:'Service location',w:165,sort:true,first:'asc'},
@@ -4175,7 +4177,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   {k:'total',label:'Total incidents',w:135,sort:true,first:'desc'},
   {k:'lastAt',label:'Last incident time',w:170,sort:true,first:'desc'},
   {k:'lastSev',label:'Last incident severity',w:165,sort:true,first:'desc'},
-  {k:'actions',label:'Actions',w:190,align:'right'}
+  {k:'actions',label:'Actions',w:104,align:'right'}
  ];
  const ageBand=a=>a<18?'u18':a<40?'18-39':a<65?'40-64':'65+';
  function buildPatients(){
@@ -4185,7 +4187,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
    return {p,pid:p.id,name:p.name,age:p.age??'',loc:p.serviceLocation||'—',facility:p.facility||'—',total:hist.length,lastAt:last?new Date(last.submittedAt).getTime():null,lastSev:last?last.form.severity||'':null};
   });
   const q=st.q.trim().toLowerCase();
-  if(q)list=list.filter(o=>[o.name,o.pid,o.loc,o.facility].join(' ').toLowerCase().includes(q));
+  if(q)list=list.filter(o=>[o.name,rPid(o.pid),o.loc,o.facility].join(' ').toLowerCase().includes(q));
   if(f.loc!=='all')list=list.filter(o=>o.loc===f.loc);
   if(f.facility!=='all')list=list.filter(o=>o.facility===f.facility);
   if(f.severity!=='all')list=list.filter(o=>o.lastAt!==null&&(f.severity==='none'?!o.lastSev:o.lastSev===f.severity));
@@ -4194,7 +4196,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const val={pid:o=>o.pid,name:o=>o.name,age:o=>o.age===''?-1:o.age,loc:o=>o.loc,facility:o=>o.facility,total:o=>o.total,lastAt:o=>o.lastAt,lastSev:o=>o.lastSev===null?null:sevRank(o.lastSev)}[key]||(o=>o.name);
   list.sort((a,b)=>{const x=val(a),y=val(b);if(x===null&&y===null)return cmp(a.name,b.name);if(x===null)return 1;if(y===null)return -1;return sign*cmp(x,y)||cmp(a.name,b.name)});
   const size=st.size;st.page=clamp(st.page,1,Math.max(1,Math.ceil(list.length/size)));
-  const rows=list.slice((st.page-1)*size,st.page*size).map(o=>`<tr tabindex="0" data-tbl-row="patients" data-id="${esc(o.pid)}"><td class="tbl-nw">${esc(o.pid)}</td><td>${esc(o.name)}</td><td class="tbl-nw">${o.age===''?'—':o.age}</td><td>${esc(o.loc)}</td><td>${esc(o.facility)}</td><td class="tbl-nw">${o.total}</td><td class="tbl-nw">${o.lastAt?esc(rFmt(o.lastAt)):'—'}</td><td class="tbl-nw">${o.lastAt?sevCell(o.lastSev):'—'}</td><td class="tbl-r"><span class="tbl-actions"><button type="button" class="tbl-btn" data-open data-r="patient-history" data-id="${esc(o.pid)}" aria-label="View incident history for ${esc(o.name)}">History</button><button type="button" class="tbl-btn" data-r="patient-report" data-id="${esc(o.pid)}" aria-label="Report incident for ${esc(o.name)}">Report incident</button></span></td></tr>`);
+  const rows=list.slice((st.page-1)*size,st.page*size).map(o=>`<tr tabindex="0" data-tbl-row="patients" data-id="${esc(o.pid)}"><td class="tbl-nw">${esc(rPid(o.pid))}</td><td>${esc(o.name)}</td><td class="tbl-nw">${o.age===''?'—':o.age}</td><td>${esc(o.loc)}</td><td>${esc(o.facility)}</td><td class="tbl-nw">${o.total}</td><td class="tbl-nw">${o.lastAt?esc(rFmt(o.lastAt)):'—'}</td><td class="tbl-nw">${o.lastAt?sevCell(o.lastSev):'—'}</td><td class="tbl-r"><span class="tbl-actions"><button type="button" class="tbl-ic" data-open data-r="patient-history" data-id="${esc(o.pid)}" title="Incident history" aria-label="View incident history for ${esc(o.name)}">${icon('history',18)}</button><button type="button" class="tbl-ic" data-r="patient-report" data-id="${esc(o.pid)}" title="Report incident" aria-label="Report incident for ${esc(o.name)}">${icon('file-plus',18)}</button></span></td></tr>`);
   const scope=[['both','All relevant patients'],['residents','Current residents'],['appointments','Today’s appointments']];
   const locs=[['all','All'],...['Residential Unit','Outpatient Clinic','Emergency Department'].map(x=>[x,x])];
   const facs=[['all','All'],['North Branch','North Branch'],['South Branch','South Branch']];
@@ -4369,7 +4371,7 @@ function incClaimable(r){const s=incStatus(r);return s==='Reported'||(s==='In Re
   const p=rPatient(pid);
   const hist=rState.reports.filter(r=>r.historyVisible&&rSite(r.location)&&incHasPatient(r,pid)).sort((a,b)=>new Date(b.submittedAt)-new Date(a.submittedAt));
   const fact=(l,v)=>`<div><small>${l}</small><strong>${v}</strong></div>`;
-  const info=`<section class="c39-patient" aria-label="Patient information"><h3>${esc(p.name)}</h3><div class="c39-facts">${fact('PID',esc(p.id))}${fact('Age',p.age??'—')}${fact('Service location',esc(p.serviceLocation||'—'))}${fact('Facility',esc(p.facility||'—'))}</div></section>`;
+  const info=`<section class="c39-patient" aria-label="Patient information"><h3>${esc(p.name)}</h3><div class="c39-facts">${fact('PID',esc(rPid(p.id)))}${fact('Age',p.age??'—')}${fact('Service location',esc(p.serviceLocation||'—'))}${fact('Facility',esc(p.facility||'—'))}</div></section>`;
   const rows=hist.map(r=>`<tr><td class="tbl-nw">${esc(r.id)}</td><td>${esc(rShortClass(r.form))}</td><td class="tbl-nw">${sevCell(r.form.severity)}</td><td class="tbl-nw">${badge(rStatus(r))}</td><td class="tbl-nw">${esc(rFmt(r.submittedAt))}</td><td class="tbl-nw">${esc(incRole(r,pid))}</td><td class="tbl-r"><button type="button" class="tbl-btn" data-pt-view="${esc(r.id)}" aria-label="View incident ${esc(String(r.id).replace(/^INC-?0*/,'IR'))}">View</button></td></tr>`).join('');
   const table=`<div class="c40-histwrap"><table class="c40-hist"><thead><tr><th scope="col">Incident ID</th><th scope="col">Incident type</th><th scope="col">Severity</th><th scope="col">Status</th><th scope="col">Submitted on</th><th scope="col">Role</th><th scope="col" class="tbl-r">Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   const body=`${info}${hist.length?table:'<p class="c39-empty">No incident history available for this patient.</p>'}`;
@@ -6207,6 +6209,45 @@ ${sec('other','Other details',otherN?`${otherN} filled`:'None added',other)}
   if(v){const [d,t]=v.split('T');f.eventDate=d;f.eventTime=t||''}else{f.eventDate='';f.eventTime=''}
   f.timeUnknown=false;f.approximate=false;rUI.formDirty=true;
  },true);
+})();
+</script>
+<style data-bundled-from="page-scroll.css">
+/* Page scroll for My Reports, My Reviews and Patients: the page scrolls, not the table box.
+   Column headers stick under the top bar; the pagination bar sticks above the prototype bar.
+   When the columns do not fit the width, the table scrolls sideways inside its own box (.tbl-h) and the header stops sticking there. */
+:root{--pg-top:50px;--pg-bar:32px}
+html:has(body[data-ws="reporter"]),html:has(body[data-ws="reviewer"]){height:auto!important;overflow:visible!important;scrollbar-gutter:stable}
+body[data-ws="reporter"],body[data-ws="reviewer"]{height:auto!important;min-height:100vh;overflow:visible!important;padding-bottom:var(--pg-bar)!important}
+body[data-ws="reporter"]:has(.rp-drawer,.vr14-drawer,.ip-overlay,#modal-root>*),body[data-ws="reviewer"]:has(.rp-drawer,.vr14-drawer,.ip-overlay,#modal-root>*){overflow:hidden!important}
+body[data-ws="reporter"] .topbar,body[data-ws="reviewer"] .topbar{position:sticky!important;top:0!important;z-index:50}
+body[data-ws="reporter"] #reporter-shell,body[data-ws="reviewer"] #admin-shell{display:block!important;height:auto!important;min-height:0!important;overflow:visible!important}
+body[data-ws="reporter"] #reporter-shell #reporter-main,body[data-ws="reporter"] #reporter-shell #reporter-main>.r-panel,body[data-ws="reviewer"] #admin-shell #content,body[data-ws="reviewer"] #admin-shell #content>.vr-main{display:block!important;height:auto!important;min-height:0!important;overflow:visible!important;flex:none!important}
+body[data-ws="reporter"] #reporter-shell #reporter-main>.r-panel,body[data-ws="reviewer"] #admin-shell #content>.vr-main{padding-bottom:20px!important}
+body[data-ws="reporter"] .u18-table-shell,body[data-ws="reviewer"] .u18-table-shell{display:flex!important;flex-direction:column;flex:none!important;height:auto!important;min-height:280px!important;overflow:clip!important}
+body[data-ws="reporter"] .tbl-scroll,body[data-ws="reviewer"] .tbl-scroll{flex:none!important;overflow:visible!important;overscroll-behavior:auto;scrollbar-gutter:auto}
+body[data-ws="reporter"] .tbl-scroll.tbl-h,body[data-ws="reviewer"] .tbl-scroll.tbl-h{overflow-x:auto!important;overflow-y:hidden!important}
+body[data-ws="reporter"] .tbl-table th,body[data-ws="reviewer"] .tbl-table th{top:var(--pg-top)}
+body[data-ws="reporter"] .tbl-scroll.tbl-h .tbl-table th,body[data-ws="reviewer"] .tbl-scroll.tbl-h .tbl-table th{top:0}
+body[data-ws="reporter"] .tbl-foot,body[data-ws="reviewer"] .tbl-foot{position:sticky;bottom:var(--pg-bar);z-index:6;background:#fff}
+body[data-ws="reporter"] .tbl-ic{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:6px;background:transparent;color:#285678;cursor:pointer;padding:0}
+body[data-ws="reporter"] .tbl-ic:hover{background:#e9f2fa;border-color:#b9d4e7}
+body[data-ws="reporter"] .tbl-ic:focus-visible{outline:2px solid #1c75a2;outline-offset:1px}
+body[data-ws="reporter"] .tbl-actions:has(.tbl-ic){display:inline-flex;gap:2px;align-items:center}
+</style>
+<script data-bundled-from="page-scroll.js">
+(function(){
+ /* Mark tables whose columns do not fit, so only those scroll sideways. */
+ let queued=false;
+ function fit(){queued=false;document.querySelectorAll('.tbl-scroll').forEach(sc=>{const t=sc.querySelector('table.tbl-table');if(!t)return;const need=parseFloat(t.style.minWidth)||0,have=(sc.parentElement||sc).clientWidth;sc.classList.toggle('tbl-h',need>have+0.5)})}
+ const queue=()=>{if(!queued){queued=true;requestAnimationFrame(fit)}};
+ window.addEventListener('resize',queue);
+ new MutationObserver(queue).observe(document.body,{childList:true,subtree:true});
+ /* After a page or page-size change, bring the table back to the top of the screen. */
+ document.addEventListener('click',e=>{
+  if(!e.target.closest('.tbl-foot button'))return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{const sc=document.querySelector('.tbl-scroll');if(!sc)return;const top=sc.getBoundingClientRect().top,stick=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pg-top'))||50;if(top<stick)window.scrollBy({top:top-stick,behavior:'instant'})}));
+ },true);
+ queue();
 })();
 </script>
 </body></html>
